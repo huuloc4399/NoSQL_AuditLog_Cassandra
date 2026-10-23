@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-10-22T13:10:17.471Z",
+  "checks": [
+    "Daily sample preparation is idempotent",
+    "Today Payment ERROR and time range filter",
+    "Updated account and UPDATE_USER are persisted; identical event in all three tables",
+    "Temporary account disabled, enabled and removed with audit",
+    "Service CRUD has all three audit actions",
+    "TTL 30 seconds expires from all three Cassandra tables"
+  ],
+  "preparation": {
+    "first": {
+      "date": "2026-10-22",
+      "added": 0,
+      "existing": 48,
+      "skipped": []
+    },
+    "second": {
+      "date": "2026-10-22",
+      "added": 0,
+      "existing": 48,
+      "skipped": []
+    }
+  },
+  "filteredErrors": 3,
+  "userUpdate": {
+    "log_id": "f5b884fd-840f-432a-b902-18f3e15ab474",
+    "actor": "admin",
+    "changed_fields": [
+      "full_name",
+      "email"
+    ],
+    "copies": 3
+  },
+  "serviceCrud": {
+    "name": "DefenseService1792674618132",
+    "actions": [
+      "DELETE_SERVICE",
+      "UPDATE_SERVICE",
+      "CREATE_SERVICE"
+    ],
+    "removed": true,
+    "source": "API-create-edit-delete"
+  },
+  "ttl": {
+    "id": "7e16e4bc-2edb-44a5-b8c7-d4721627cd93",
+    "before": 30,
+    "waitSeconds": 32,
+    "expired": true,
+    "remainingRowsAcrossThreeTables": 0
+  },
+  "status": "PASSED"
+}

@@ -1,0 +1,21 @@
+{
+  "name": "audit-log-system-root",
+  "version": "1.0.0",
+  "description": "Root orchestrator scripts for Audit Log Monitoring System",
+  "scripts": {
+    "dev": "node -e \"console.log('\\n[NOTICE] Please run Backend and Frontend in separate terminals:\\n  Terminal 1: npm run backend:dev\\n  Terminal 2: npm run frontend:dev\\n')\"",
+    "seed": "npm run seed --prefix backend",
+    "seed:dummy": "npm run seed:dummy --prefix backend",
+    "test": "npm run test --prefix backend",
+    "test:perf": "npm run test:perf --prefix backend",
+    "demo:ttl": "npm run demo:ttl --prefix backend",
+    "backend:dev": "npm run dev --prefix backend",
+    "backend:build": "npm run build --prefix backend",
+    "frontend:dev": "npm run dev --prefix frontend",
+    "frontend:build": "npm run build --prefix frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "demo": "npm run demo --prefix frontend",
+    "build:demo": "npm run build:demo --prefix frontend",
+    "test:rbac": "npm run test:rbac --prefix backend"
+  }
+}

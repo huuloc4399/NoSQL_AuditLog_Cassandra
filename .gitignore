@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+dist/
+dist-api/
+.npm-cache/
+
+# Local configuration and runtime data
+.env
+.env.*
+!.env.example
+!.env.demo
+.runtime/
+.work/
+tools/
+*.log
+*.pid
+*.pem
+*.key
+
+# Local reports, archives, and working notes
+*.doc
+*.docx
+*.pdf
+DANH_GIA_DE_TAI_10.md
+*.zip
+scratch_*
+~$*
+.DS_Store
+Thumbs.db

@@ -1,0 +1,130 @@
+{
+  "status": "PASSED",
+  "checks": 80,
+  "tested_at": "2026-10-22T14:18:24.075Z",
+  "database": "Cassandra",
+  "events": [
+    {
+      "id": "5aa84eec-8946-4862-bfc8-4c4f2fbc422b",
+      "action": "CANCEL_ORDER",
+      "level": "WARN",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "order_id": "ab595bb0-d656-4207-a450-7de40df82699",
+        "reason": "customer_request"
+      }
+    },
+    {
+      "id": "1238db1c-702d-4547-9ba6-0f30dc1b6db5",
+      "action": "CREATE_ORDER",
+      "level": "INFO",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "order_id": "ab595bb0-d656-4207-a450-7de40df82699",
+        "total": 690000,
+        "currency": "VND",
+        "items": [
+          {
+            "product_id": "speaker",
+            "quantity": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "53cbb17f-64af-42d3-b201-1c578e082bf9",
+      "action": "ADD_TO_CART",
+      "level": "INFO",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "items": [
+          {
+            "product_id": "speaker",
+            "quantity": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "71cf0b63-7660-4ae9-869b-b60c4e4ace8f",
+      "action": "CREATE_ORDER",
+      "level": "INFO",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "order_id": "d3cf2ada-0f1f-4d95-a250-24a1d3bc6521",
+        "total": 780000,
+        "currency": "VND",
+        "items": [
+          {
+            "product_id": "mouse",
+            "quantity": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "413e0b6f-9ebb-4cfa-a179-1ffc7b43e24e",
+      "action": "ADD_TO_CART",
+      "level": "INFO",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "items": [
+          {
+            "product_id": "mouse",
+            "quantity": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "a1dbc94d-67de-44d7-9d7a-e36f0d59395a",
+      "action": "PAYMENT_SUCCESS",
+      "level": "INFO",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "order_id": "d3cf2ada-0f1f-4d95-a250-24a1d3bc6521",
+        "payment_id": "4cf4d093-35a7-49bc-9b0c-bc6aa7e3dcf0",
+        "outcome": "success",
+        "amount": 780000,
+        "currency": "VND",
+        "attempt": 3
+      }
+    },
+    {
+      "id": "d7244207-4a5d-43bd-8c7a-62b2ecd637fc",
+      "action": "PAYMENT_FAILED",
+      "level": "ERROR",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "order_id": "d3cf2ada-0f1f-4d95-a250-24a1d3bc6521",
+        "payment_id": "962131b8-6899-49ce-9565-9b199335f779",
+        "outcome": "timeout",
+        "amount": 780000,
+        "currency": "VND",
+        "attempt": 2
+      }
+    },
+    {
+      "id": "cbbd8a50-da49-41de-a0e7-59adfa8697ca",
+      "action": "PAYMENT_FAILED",
+      "level": "ERROR",
+      "details": {
+        "simulated": true,
+        "owner_user_id": "91d7fd9f-9489-4d62-9271-e63c000ca9c9",
+        "order_id": "d3cf2ada-0f1f-4d95-a250-24a1d3bc6521",
+        "payment_id": "9ee51ed2-68cb-4b91-850a-11decdfd43fc",
+        "outcome": "declined",
+        "amount": 780000,
+        "currency": "VND",
+        "attempt": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "headphones",
+    "name": "Tai nghe không dây AirTone",
+    "category": "Âm thanh",
+    "price": 1290000,
+    "oldPrice": 1590000,
+    "image": "/products/headphones.png",
+    "badge": "Được yêu thích",
+    "description": "Êm tai, nhẹ nhàng. Kết nối Bluetooth, thời lượng pin mẫu 40 giờ và đệm tai mềm cho góc làm việc của bạn.",
+    "specs": [
+      "Bluetooth 5.3",
+      "Pin 40 giờ",
+      "Màu xanh sage"
+    ]
+  },
+  {
+    "id": "keyboard",
+    "name": "Bàn phím cơ Studio 75",
+    "category": "Góc làm việc",
+    "price": 890000,
+    "oldPrice": 1090000,
+    "image": "/products/keyboard.png",
+    "badge": "Lựa chọn mới",
+    "description": "Bố cục nhỏ gọn, phím bấm êm và phối màu kem xanh. Một điểm nhấn vừa đủ cho bàn làm việc.",
+    "specs": [
+      "Bố cục 75%",
+      "Kết nối USB-C",
+      "Switch êm"
+    ]
+  },
+  {
+    "id": "mouse",
+    "name": "Chuột không dây Pebble",
+    "category": "Góc làm việc",
+    "price": 390000,
+    "oldPrice": 490000,
+    "image": "/products/mouse.png",
+    "badge": "",
+    "description": "Thiết kế gọn trong lòng bàn tay, thao tác yên tĩnh và kết nối không dây tiện lợi mỗi ngày.",
+    "specs": [
+      "Kết nối không dây",
+      "Click yên tĩnh",
+      "Màu xanh sage"
+    ]
+  },
+  {
+    "id": "speaker",
+    "name": "Loa Bluetooth Mini Sound",
+    "category": "Âm thanh",
+    "price": 690000,
+    "oldPrice": 850000,
+    "image": "/products/speaker.png",
+    "badge": "Nhỏ mà hay",
+    "description": "Âm nhạc theo bạn từ góc bàn đến chuyến đi cuối tuần. Lớp vải dệt ấm áp, thiết kế dễ mang theo.",
+    "specs": [
+      "Bluetooth 5.3",
+      "Pin mẫu 12 giờ",
+      "Màu cát"
+    ]
+  }
+]

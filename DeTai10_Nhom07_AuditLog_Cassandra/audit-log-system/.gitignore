@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-api/
+.npm-cache/
+.work/
+.env
+*.log
+!.env.example
+!.env.demo

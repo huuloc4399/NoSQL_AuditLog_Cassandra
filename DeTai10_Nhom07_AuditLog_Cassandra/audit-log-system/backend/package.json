@@ -1,0 +1,44 @@
+{
+  "name": "audit-log-backend",
+  "version": "1.0.0",
+  "description": "Enterprise Audit Log Monitoring Backend powered by Apache Cassandra",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:init": "tsx scripts/initDb.ts",
+    "seed": "tsx scripts/generateDummyData.ts",
+    "seed:dummy": "tsx scripts/generateDummyData.ts",
+    "test:perf": "tsx scripts/performanceTest.ts",
+    "demo:ttl": "tsx scripts/runTtlDemo.ts",
+    "test": "tsx tests/runTests.ts",
+    "test:rbac": "tsx tests/rbac.http.test.ts",
+    "seed:demo": "tsx scripts/generateDummyData.ts --if-empty",
+    "verify:database": "tsx scripts/verifyRealDatabase.ts",
+    "seed:today": "tsx scripts/prepareTodayDemo.ts",
+    "test:audit": "tsx tests/auditReliability.test.ts",
+    "verify:defense": "tsx scripts/verifyDefense.ts",
+    "verify:shop": "tsx scripts/verifyShop.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cassandra-driver": "^4.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.13.10",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
