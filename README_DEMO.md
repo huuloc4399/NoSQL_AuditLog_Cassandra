@@ -11,13 +11,15 @@ Chạy START_DEMO.bat hoặc START_REAL_DEMO.bat rồi mở http://127.0.0.1:517
 | Admin | admin | admin123 |
 | User | user | user12345 |
 
-Cassandra 4.1.12 chạy trong Ubuntu 22.04 WSL2 tại 127.0.0.1:9042, keyspace audit_log_system. Bộ mẫu ban đầu có 400 log từ 4 dịch vụ. Mỗi lần khởi động chuẩn bị thêm 48 log mẫu của ngày UTC hiện tại, đủ INFO/WARN/ERROR; chạy lại cùng ngày không tạo trùng. Mẫu theo ngày tự hết hạn sau 7 ngày, dữ liệu cũ được giữ nguyên.
+Cassandra 4.1.12 chạy trong Ubuntu 22.04 WSL2 (tên đăng ký `AuditFlow-Recovered` trên máy này) tại 127.0.0.1:9042, keyspace audit_log_system. Bộ mẫu ban đầu có 400 log từ 4 dịch vụ. Mỗi lần khởi động chuẩn bị thêm 48 log mẫu của ngày UTC hiện tại, đủ INFO/WARN/ERROR; chạy lại cùng ngày không tạo trùng. Mẫu theo ngày tự hết hạn sau 7 ngày, dữ liệu cũ được giữ nguyên.
 
 ## User chạy demo
 
-Đăng nhập User sẽ mở **Nếp Store**: xem bốn sản phẩm có ảnh, chọn mua, chỉnh giỏ hàng, điền địa chỉ mẫu, đặt hàng rồi thanh toán giả lập. Có lịch sử đơn, hủy đơn chưa trả tiền, tình huống trả tiền bị từ chối/timeout và thử lại. Giỏ và đơn lưu thật trong Cassandra; không thu tiền hay giao hàng. Admin vẫn mở Dashboard Audit Log. Trang đăng nhập đã bỏ phần giới thiệu, chỉ giữ biểu mẫu. Chi tiết và đề xuất sau khi đọc n7.docx: **DEMO_CUA_HANG.md**.
+Đăng nhập User sẽ mở **Nếp Store**: xem bốn sản phẩm có ảnh, chọn mua, chỉnh giỏ hàng, điền địa chỉ mẫu, đặt hàng rồi thanh toán giả lập. Có lịch sử đơn, hủy đơn chưa trả tiền, tình huống trả tiền bị từ chối/timeout và thử lại. Giỏ và đơn mẫu lưu trên trình duyệt theo tài khoản; các thao tác gửi Audit Log về Cassandra. Không thu tiền hay giao hàng. Admin vẫn mở Dashboard Audit Log. Trang đăng nhập đã bỏ phần giới thiệu, chỉ giữ biểu mẫu. Chi tiết và đề xuất sau khi đọc n7.docx: **DEMO_CUA_HANG.md**.
 
 ## Các tiện ích
+
+Sản phẩm, giỏ và đơn là dữ liệu mô phỏng ở giao diện. Cassandra chỉ giữ năm bảng nền tảng cho Audit Log, dịch vụ và tài khoản; không tạo bảng sản phẩm hoặc bảng cửa hàng. Lịch sử đơn không đồng bộ sang máy khác.
 
 - STOP_REAL_DEMO.bat: dừng tiến trình của dự án, giữ database.
 - OPEN_CASSANDRA.bat: mở CQLSH tương tác.
@@ -32,7 +34,7 @@ Sửa tài khoản có UPDATE_USER. Thay đổi người dùng/dịch vụ và b
 
 Đã đạt 134 kiểm tra tự động (60 chức năng/tích hợp, 52 HTTP/phân quyền, 22 tiêm lỗi), 6 bài hiệu năng và bài diễn tập sống với CQLSH. Backend/Frontend build thành công.
 
-Bổ sung cửa hàng: **80 kiểm tra sống đạt** cho giỏ hàng/đơn hàng, giá máy chủ, request lặp, quyền sở hữu và ba bản sao audit. Có hai bảng mới `shop_carts`, `shop_orders`; tổng cộng bảy bảng ứng dụng. Kết quả lưu tại docs/shop-verification.json. Bộ 134 kiểm tra cũ đã được chạy lại và đạt sau thay đổi.
+Cập nhật cửa hàng ngày 27/10: đã bỏ phần lưu giỏ/đơn trong Cassandra và các API nghiệp vụ tương ứng, giữ endpoint ghi sự kiện. `npm run test:shop` đạt 72 kiểm tra cho dữ liệu trình duyệt và API Audit Log; `npm run test:audit` đạt 22 kiểm tra. Kết quả 80 kiểm tra sống trong docs/shop-verification.json thuộc phiên bản cũ lưu giỏ/đơn ở DB, không dùng để xác nhận kiến trúc hiện tại. Đã khôi phục WSL, chạy thành công `npm run db:remove-shop-tables` và xác nhận còn năm bảng nền tảng. Luồng mua hàng với API thật đã đạt; bốn sự kiện đều có đủ ba bản sao trong Cassandra. Chi tiết đường dẫn ổ đĩa và cấu hình WSL ở REAL_DATABASE.md.
 
 ## Tài liệu hiện tại
 

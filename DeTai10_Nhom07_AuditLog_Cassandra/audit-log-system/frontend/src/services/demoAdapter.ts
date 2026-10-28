@@ -1,6 +1,5 @@
 import { AxiosAdapter, AxiosError } from 'axios';
 import { AuditLog, AuditLevel, ServiceItem, UserItem, UserRole } from '../types';
-import { handleShopDemo } from './shopDemo';
 
 // Explicit browser-only simulation. Never selected in the normal API build.
 interface DemoUser extends UserItem { password: string }
@@ -47,7 +46,13 @@ export const demoAdapter: AxiosAdapter = async config => {
   const current = state.users.find(u => u.user_id === sessionUser && u.status === 'ACTIVE');
   if (!current) fail('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', 401);
   const actor = current!;
-  if (path.startsWith('/shop/')) return handleShopDemo(path, method, body, actor, event, ok, fail);
+  if (path === '/shop/events' && method === 'post') {
+    const action = String(body.action);
+    if (!['ADD_TO_CART', 'REMOVE_FROM_CART', 'UPDATE_CART', 'CREATE_ORDER', 'CANCEL_ORDER', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED'].includes(action)) fail('Thao tác cửa hàng không hợp lệ.');
+    const log = event(action.startsWith('PAYMENT') ? 'Payment' : 'Order', action, action === 'PAYMENT_FAILED' ? 'ERROR' : action === 'CANCEL_ORDER' ? 'WARN' : 'INFO', `Thao tác mua sắm mẫu: ${action}`, actor.username);
+    log.details = JSON.stringify({ ...body, simulated: true, source: 'BROWSER_SHOP', owner_user_id: actor.user_id });
+    return ok({ auditLog: log }, 'Đã ghi nhật ký xem thử', 201);
+  }
   if (path === '/demo/my-actions' && method === 'post') {
     const scenarios = ['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'UPDATE_USER', 'CREATE_ORDER', 'UPDATE_ORDER', 'CANCEL_ORDER', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED'];
     if (!scenarios.includes(body.scenario) || Object.keys(body).some(key => key !== 'scenario')) fail('Tình huống demo không hợp lệ.');

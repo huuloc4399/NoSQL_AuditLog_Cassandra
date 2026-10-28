@@ -5,7 +5,6 @@ import { connectCassandra, closeCassandra } from './config/cassandra.js';
 import apiRouter from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { userService } from './services/userService.js';
-import { initShop } from './services/shopService.js';
 
 const app = express();
 
@@ -58,7 +57,6 @@ async function startServer() {
     throw new Error('Cassandra is unavailable. Start the database before starting the real-data demo.');
   }
   await userService.initDb();
-  await initShop();
 
   const server = app.listen(env.PORT, () => {
     console.log(`[Server] REST API listening on port ${env.PORT} -> http://localhost:${env.PORT}`);

@@ -15,10 +15,8 @@ foreach ($name in @('frontend', 'backend')) {
         Write-Host "Stopped this project's $name process."
     }
 }
-$wsl = (Get-Command wsl.exe -ErrorAction Stop).Source
-$wslInputPath = $taskRoot.Replace('\', '/')
-$linuxRootResult = & $wsl -d Ubuntu-22.04 -- wslpath -a $wslInputPath
-if ($LASTEXITCODE -ne 0 -or -not $linuxRootResult) { throw 'Cannot resolve project directory in WSL.' }
-$linuxRoot = $linuxRootResult.Trim()
-& $wsl -d Ubuntu-22.04 -- bash "$linuxRoot/scripts/cassandra-wsl.sh" stop
+. (Join-Path $PSScriptRoot 'project-wsl.ps1')
+$linuxRoot = Get-ProjectLinuxRoot
+& $projectWslExe @projectWslArgs bash "$linuxRoot/scripts/cassandra-wsl.sh" stop
+if ($LASTEXITCODE -ne 0) { throw 'Cassandra stop failed.' }
 Write-Host 'Database data has been preserved.'

@@ -13,13 +13,17 @@ The demo has exactly two application roles: `ADMIN` and `USER`.
 | POST `/api/demo/my-actions` | Own simulated scenarios | Allowed |
 | Other `/api/demo/*`, `/api/logs/ttl-demo`, `/api/logs/ttl-status/:id` | Denied | Allowed |
 | GET `/api/system/status` | Denied | Allowed |
-| `/api/shop/products`, `/api/shop/cart`, `/api/shop/orders` and order subroutes | Own cart/orders | Own cart/orders |
+| POST `/api/shop/events` | Authenticated simulated events | Authenticated simulated events |
 
 The backend verifies JWTs, checks that the account still exists and is active, and authorizes using the account's current role. Deleted, disabled, missing, expired and invalid sessions return 401. Insufficient permissions return 403. Self-registration ignores a supplied role and always creates `USER`. User-management role inputs accept only `ADMIN` and `USER`.
 
 The frontend verifies stored sessions using `/auth/me` before showing protected routes. It does not grant access using a role saved in browser storage. Menu visibility and route guards match backend authorization.
 
-USER now lands on **Nếp Store** at `/`: product browsing, cart, checkout and personal order history. `/demo` redirects USER to the store; ADMIN retains the audit dashboard and original scenario console. Shop ownership always comes from authentication, never a supplied owner ID. Another account's order returns 404 even to an administrator using the shop API. Cart and order writes persist in Cassandra together with their three audit records in a logged batch. Payment settlement and shipping are simulated.
+USER now lands on **Nếp Store** at `/`: product browsing, cart, checkout and local order history. `/demo` redirects USER to the store; ADMIN retains the audit dashboard and original scenario console. Products are a static frontend catalog. Carts and simulated orders stay in browser localStorage, scoped by account and API/preview mode; another browser does not share that history. Browser storage can be changed or cleared by the person using the machine and is not a server-side authorization boundary.
+
+The shop API only accepts `POST /api/shop/events`. It identifies the actor from the authenticated session and rejects supplied identity, role, internal and shipping fields. It records three audit copies in Cassandra without storing products, carts or orders. Local state is updated after audit acknowledgement; these are separate writes, not one transaction. Payment outcomes and amounts are simulated client data, not verified financial transactions. The former product/cart/order CRUD routes have been removed.
+
+Both roles can read the shared demo audit dataset. The log API does not restrict reads to the current account's events; menu labels do not imply private audit history.
 
 The older `/demo/my-actions` API remains available for compatibility, with nine fixed scenarios that only create simulated audit events. Bulk daily data, account/service management, TTL and infrastructure remain ADMIN-only. Browser-only preview is labeled and stores shop state separately per account.
 

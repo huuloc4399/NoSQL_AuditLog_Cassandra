@@ -12,12 +12,12 @@ echo   SELECT service_name, log_time, level, action, message FROM audit_logs LIM
 echo   EXPAND ON;
 echo.
 echo Current tables:
-wsl -d Ubuntu-22.04 -- bash /mnt/d/NOSQL_NHOM7_AuditLog_Cassandra/scripts/cassandra-wsl.sh cql --keyspace audit_log_system -e "DESCRIBE TABLES;"
+powershell.exe -NoProfile -File "%~dp0scripts\cassandra-console.ps1" -Action tables
 if errorlevel 1 (
   echo Start START_REAL_DEMO.bat first, then open this file again.
   pause
   exit /b 1
 )
 echo.
-wsl -d Ubuntu-22.04 -- bash /mnt/d/NOSQL_NHOM7_AuditLog_Cassandra/scripts/cassandra-wsl.sh cql --keyspace audit_log_system
+powershell.exe -NoProfile -File "%~dp0scripts\cassandra-console.ps1" -Action shell
 pause

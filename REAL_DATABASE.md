@@ -1,3 +1,13 @@
+# Khôi phục khởi động ngày 27 tháng 10 năm 2026
+
+Ổ đĩa Ubuntu gốc hiện ở `F:\BigData\traffic_rebuild\runtime\wsl\Ubuntu-22.04\ext4.vhdx`; đăng ký WSL cũ vẫn tham chiếu ổ D nên không khởi động được. Đã dùng `wsl --import-in-place` để đăng ký chính ổ đĩa hiện có dưới tên `AuditFlow-Recovered`, giữ dữ liệu và tài khoản Linux `traffic`. Không cài lại hoặc khởi tạo database mới.
+
+Các tiện ích START_REAL_DEMO, STOP_REAL_DEMO, CHECK_CASSANDRA, OPEN_CASSANDRA và CHECK_DEMO_LOGS dùng chung `scripts/project-wsl.ps1`. Cấu hình riêng máy ở `.runtime/wsl-config.json`; máy chưa có cấu hình vẫn dùng `Ubuntu-22.04`. Có thể đặt biến `CASSANDRA_WSL_DISTRO` để chọn tên bản WSL khác. Không cần đổi bản WSL mặc định của Windows.
+
+Đã chạy lại script bằng Windows PowerShell của file BAT: website 5173, API 5000 và Cassandra 9042 hoạt động. Đăng nhập User, thêm giỏ, đặt đơn, thanh toán lỗi rồi thành công đã đạt; bốn sự kiện được đọc lại đủ 12 bản ghi trong ba bảng Audit Log. Hai bảng cửa hàng cũ đã xóa bằng lệnh bảo trì. Hiện còn `audit_logs`, `audit_logs_by_service_level`, `audit_logs_by_id`, `services`, `users`.
+
+Nếu sau này đổi ổ đĩa, lỗi khởi động sẽ nêu đúng đường dẫn VHDX bị thiếu thay vì báo chung “Ubuntu-22.04 WSL is required”. Giữ ổ đĩa gốc và cập nhật đăng ký/config WSL trước khi chạy lại.
+
 # Cập nhật vận hành ngày 22 tháng 10 năm 2026
 
 START_REAL_DEMO.bat hiện tự chuẩn bị 48 log mẫu của hôm nay (UTC) sau khi bảo toàn dữ liệu cũ. Có thể bấm Chuẩn bị dữ liệu hôm nay trong Thao tác demo khi buổi trình bày sang ngày mới. Dữ liệu cùng ngày có UUID cố định, không tạo trùng, TTL 7 ngày. Các log mẫu được đánh dấu rõ trong nội dung và details.
@@ -27,7 +37,7 @@ Các tài khoản trên được lưu trong bảng `audit_log_system.users` vớ
 
 | Thuộc tính | Giá trị |
 | --- | --- |
-| Môi trường | Ubuntu-22.04 trong WSL2, trên máy này |
+| Môi trường | Ubuntu 22.04 trong WSL2, tên đăng ký hiện tại `AuditFlow-Recovered` |
 | Phiên bản Cassandra | 4.1.12 |
 | Cụm | AuditFlow Demo |
 | Endpoint | 127.0.0.1:9042 |
@@ -68,7 +78,7 @@ npm run demo:ttl
 - Bộ kiểm thử hiện có: 60 đạt, 0 lỗi, bao gồm kiểm thử tích hợp Cassandra.
 - Bộ kiểm thử HTTP/phân quyền độc lập: 52 đạt, 0 lỗi.
 
-Các sản phẩm và đơn hàng của website bán hàng chưa được triển khai trong bước kết nối này. Bản đang chạy là giao diện AuditFlow hiện có, dùng Cassandra thật cho tài khoản, danh mục dịch vụ và Audit Log. Những tình huống nghiệp vụ trên trang “Thao tác demo” tạo sự kiện minh họa; đây chưa phải một hệ thống thanh toán thật.
+Giao diện User là Nếp Store, dùng sản phẩm tĩnh và lưu giỏ/đơn mẫu trên trình duyệt. Cassandra thật giữ tài khoản, danh mục dịch vụ và Audit Log. Mua hàng và thanh toán chỉ tạo sự kiện minh họa, không thu tiền và không lưu đơn trong database.
 
 ## Dừng và chạy lại
 
@@ -78,6 +88,8 @@ Các sản phẩm và đơn hàng của website bán hàng chưa được triể
 
 Các tiến trình chạy nền; log khởi động nằm tại `.runtime`. Không chạy `wsl --shutdown` trong lúc demo. Bản cục bộ một node dùng để trình diễn và kiểm thử trên máy này.
 
-## Cửa hàng Nếp Store (22/10/2026)
-Backend khởi tạo thêm shop_carts và shop_orders trong cùng keyspace audit_log_system. Giỏ/đơn được lưu theo user_id; tải lại trang hoặc đăng nhập lại vẫn còn. Các lần đặt hàng/thanh toán/hủy sinh Audit Log thật. Xem DEMO_CUA_HANG.md và database/07_shop.cql. Không có thanh toán hay giao hàng thật.
+## Cửa hàng Nếp Store hiện tại
+Danh mục sản phẩm nằm trong frontend; giỏ và đơn mẫu được lưu trên trình duyệt theo tài khoản và chế độ chạy. Backend chỉ tiếp nhận sự kiện mua hàng tại `POST /api/shop/events` rồi ghi ba bản Audit Log. Keyspace có năm bảng nền tảng: `users`, `services`, `audit_logs`, `audit_logs_by_service_level` và `audit_logs_by_id`.
+
+Nếu nâng cấp từ phiên bản từng có `shop_carts` và `shop_orders`, chạy riêng `npm run db:remove-shop-tables` tại backend để bỏ hai bảng cũ. Lệnh này không chạy khi khởi động và giữ nguyên tài khoản, dịch vụ, nhật ký. CQL tương đương ở `database/07_remove_legacy_shop.cql`. Xem DEMO_CUA_HANG.md để thao tác mua hàng mô phỏng; không có thanh toán hoặc giao hàng thật.
 

@@ -301,17 +301,22 @@ Các API này đại diện cho các hành vi nghiệp vụ thực tế của c�
 | `POST` | `/demo/payments/success` | Thanh toán hóa đơn thành công | `PAYMENT_SUCCESS` | `INFO` |
 | `POST` | `/demo/payments/failed` | Thanh toán thất bại (Gateway Timeout)| `PAYMENT_FAILED` | `ERROR` |
 | `POST` | `/demo/payments/refund` | Hoàn tiền giao dịch | `REFUND` | `INFO` |
-# Cửa hàng bổ sung ngày 22/10/2026
+# Sự kiện cửa hàng cập nhật 27/10/2026
 
-Các endpoint `/api/shop/*` đều yêu cầu JWT và chỉ thao tác giỏ/đơn của tài khoản hiện tại, kể cả khi người gọi là Admin. UUID người dùng không nhận từ request. Response `{ data: ... }`; lỗi dùng handler chung (400 validation, 401 phiên, 404 đơn không thuộc mình, 409 chuyển trạng thái không hợp lệ, 503 DB).
+Sản phẩm, giỏ hàng, đơn hàng và các lần thanh toán mẫu thuộc giao diện, lưu cục bộ theo tài khoản và chế độ chạy. Không có API CRUD giỏ/đơn hoặc API lấy danh mục; không tạo bảng sản phẩm, `shop_carts`, `shop_orders`.
 
-| Method | Endpoint | Body/chức năng |
+| Method | Endpoint | Chức năng |
 | --- | --- | --- |
-| GET | `/api/shop/products` | Danh mục mẫu, giá VND và đường dẫn ảnh |
-| GET / PUT | `/api/shop/cart` | PUT `{ items: [{ product_id, quantity }] }`, tối đa bốn ID khác nhau, số lượng 1–10 |
-| GET / POST | `/api/shop/orders` | GET lịch sử của mình; POST `{ order_id: UUID, shipping: { name, phone, address } }`, lấy giỏ từ DB, tính giá máy chủ, lưu đơn và làm trống giỏ |
-| GET | `/api/shop/orders/:id` | Chi tiết đơn của mình |
-| POST | `/api/shop/orders/:id/pay` | `{ attempt_id: UUID, outcome: 'success' / 'declined' / 'timeout' }` — giả lập, không thu tiền |
-| POST | `/api/shop/orders/:id/cancel` | `{}` — chỉ hủy đơn chưa thanh toán |
+| POST | `/api/shop/events` | Xác thực JWT và ghi sự kiện mô phỏng vào ba bảng Audit Log hiện có; trả 201 với `{ success: true, data: { auditLog } }` |
 
-Gửi lại order_id hoặc attempt_id đã dùng không tạo thao tác lặp. Một đơn tối đa 10 lần thử thanh toán. Cơ chế tuần tự theo tài khoản chỉ dành cho một tiến trình backend demo. Business write và ba audit INSERT cùng logged batch; không có bảo đảm SQL rollback/isolation. Xem DEMO_CUA_HANG.md tại gốc cho phạm vi và luồng UI. `/demo` của User chuyển về cửa hàng; API personal demo cũ vẫn giữ tương thích.
+Mọi request có `event_id` UUID và `action`. Payload được kiểm tra nghiêm ngặt theo từng nhóm:
+
+- `ADD_TO_CART`, `REMOVE_FROM_CART`, `UPDATE_CART`: `items`, tối đa bốn dòng `{ product_id, quantity, unit_price, subtotal }`, số lượng 1–10, không trùng mã.
+- `CREATE_ORDER`: `order_id` UUID, `items` không rỗng, `amount` bằng tổng thành tiền.
+- `CANCEL_ORDER`: `order_id` UUID.
+- `PAYMENT_SUCCESS`: `order_id`, `payment_id` UUID, `amount`, `attempt` 1–10, `outcome: success`.
+- `PAYMENT_FAILED`: các trường thanh toán trên với `outcome: declined` hoặc `timeout`.
+
+Danh tính người thực hiện lấy từ JWT/tài khoản đang hoạt động. Request không nhận `user_id`, `owner_user_id`, `role`, `internal` hoặc thông tin nhận hàng. Backend tự đặt service, level, thời gian và nguồn nhật ký. Details luôn có `simulated: true`, `source: BROWSER_SHOP`, `owner_user_id`; các giá trị giao dịch là dữ liệu mô phỏng do trình duyệt cung cấp, không được xem là giao dịch thật hoặc giá đã kiểm chứng phía máy chủ.
+
+Lỗi: 400 payload hoặc dịch vụ không hoạt động, 401 phiên đăng nhập, 503 Cassandra. Giao diện chỉ hoàn tất thay đổi cục bộ sau khi nhận xác nhận ghi nhật ký. Cache chống sự kiện lặp của Audit Log hiện có chỉ bảo vệ trong cửa sổ ngắn trên một tiến trình; không cam kết exactly-once qua khởi động lại. Các endpoint personal demo cũ vẫn giữ tương thích.

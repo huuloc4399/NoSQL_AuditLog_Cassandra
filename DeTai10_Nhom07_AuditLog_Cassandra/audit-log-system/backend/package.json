@@ -19,7 +19,8 @@
     "seed:today": "tsx scripts/prepareTodayDemo.ts",
     "test:audit": "tsx tests/auditReliability.test.ts",
     "verify:defense": "tsx scripts/verifyDefense.ts",
-    "verify:shop": "tsx scripts/verifyShop.ts"
+    "test:shop": "tsx tests/shopSimulation.test.ts",
+    "db:remove-shop-tables": "tsx scripts/removeLegacyShopTables.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

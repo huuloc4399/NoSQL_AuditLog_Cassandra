@@ -6,7 +6,7 @@ $stateDir = Join-Path $taskRoot '.runtime'
 [IO.Directory]::CreateDirectory($stateDir) | Out-Null
 $node = (Get-Command node.exe -ErrorAction Stop).Source
 $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
-$wsl = (Get-Command wsl.exe -ErrorAction Stop).Source
+. (Join-Path $PSScriptRoot 'project-wsl.ps1')
 
 function Test-LocalPort([int]$Port) {
     $client = [Net.Sockets.TcpClient]::new()
@@ -38,11 +38,8 @@ function Start-ProjectProcess([string]$Name, [string]$Executable, [string[]]$Arg
 
 Write-Host 'Starting the real Cassandra demo...'
 if (-not (Test-LocalPort 9042)) {
-    $wslInputPath = $taskRoot.Replace('\', '/')
-    $linuxRootResult = & $wsl -d Ubuntu-22.04 -- wslpath -a $wslInputPath
-    if ($LASTEXITCODE -ne 0 -or -not $linuxRootResult) { throw 'Ubuntu-22.04 WSL is required.' }
-    $linuxRoot = $linuxRootResult.Trim()
-    Start-ProjectProcess 'cassandra' $wsl @('-d', 'Ubuntu-22.04', '--', 'bash', "$linuxRoot/scripts/cassandra-wsl.sh", 'foreground') $taskRoot
+    $linuxRoot = Get-ProjectLinuxRoot
+    Start-ProjectProcess 'cassandra' $projectWslExe ($projectWslArgs + @('bash', "$linuxRoot/scripts/cassandra-wsl.sh", 'foreground')) $taskRoot
     Wait-LocalPort 9042
 }
 

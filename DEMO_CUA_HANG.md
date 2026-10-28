@@ -1,46 +1,35 @@
-# Nếp Store — demo mua sắm, cập nhật 22/10/2026
+# Nếp Store — demo giao diện và Audit Log
 
-Mở http://127.0.0.1:5173. Đăng nhập `user / user12345` để mua sắm; `admin / admin123` để xem Dashboard và Audit Log. Trang đăng nhập chỉ giữ biểu mẫu, đã bỏ phần giới thiệu bên trái.
+Cập nhật 27/10/2026: cửa hàng chỉ tạo bối cảnh thao tác cho đề tài Audit Log. Không có bảng sản phẩm, giỏ hàng hoặc đơn hàng trong thiết kế hiện tại. Không giữ `shop_orders`, vì vậy không cần bổ sung bảng đơn hàng vào SRS `n7.docx`.
 
-## Luồng trình diễn khoảng 3 phút
+## Luồng trình diễn
 
-1. User mở cửa hàng, tìm/lọc sản phẩm, bấm ảnh để xem chi tiết. Có bốn mặt hàng với ảnh riêng: tai nghe, bàn phím, chuột và loa.
-2. Chọn **Mua ngay** hoặc **Thêm vào giỏ**. Trong giỏ, tăng/giảm số lượng hoặc xóa sản phẩm; tổng tiền cập nhật theo giá máy chủ.
-3. Bấm **Tiến hành đặt hàng**, chọn **Điền thông tin mẫu**, rồi **Đặt hàng & tiếp tục**. Giỏ được chuyển thành đơn chờ thanh toán.
-4. Bấm **Thanh toán** để hoàn thành giao dịch mẫu. Muốn minh họa lỗi, mở **Thử tình huống thanh toán**, chọn **Bị từ chối** hoặc **Cổng thanh toán không phản hồi**.
-5. Sau lỗi, chọn **Thành công** rồi **Thử thanh toán lại** trên cùng đơn. Lịch sử giữ từng lần thử. Có thể hủy đơn chưa trả tiền sau bước xác nhận.
-6. Mở **Đơn hàng của tôi**, tải lại trang hoặc đăng xuất/đăng nhập: đơn và giỏ vẫn lưu trong Cassandra theo tài khoản.
-7. Admin lọc `Order` hoặc `Payment`, ngày UTC hiện tại, xem details có `order_id`, `payment_id`, `owner_user_id`, số tiền và kết quả. Luồng trả tiền lỗi → thành công dùng cùng order_id, khác payment_id.
+1. Mở ứng dụng, đăng nhập User và xem bốn sản phẩm có ảnh. Tìm, lọc, sắp xếp hoặc mở chi tiết.
+2. Thêm sản phẩm vào giỏ, tăng/giảm số lượng hoặc xóa. Giá và tổng tiền là dữ liệu mẫu tính tại giao diện.
+3. Chọn **Tiến hành đặt hàng**, **Điền thông tin mẫu**, rồi **Đặt hàng & tiếp tục**.
+4. Chọn thanh toán thành công, bị từ chối hoặc timeout. Sau lỗi có thể thử lại trên cùng đơn; có thể hủy đơn chưa thanh toán.
+5. Mở **Đơn hàng của tôi**, tải lại trang: đơn vẫn có trên cùng trình duyệt và tài khoản. Máy khác không có lịch sử này; xóa dữ liệu trình duyệt sẽ mất giỏ và đơn mẫu.
+6. Admin lọc `Order` hoặc `Payment` trong Audit Log, chọn ngày UTC hiện tại và xem `order_id`, `payment_id`, `owner_user_id`, số tiền mẫu, kết quả và lần thử. Không cần bảng nghiệp vụ để tạo nhật ký.
 
-## Đối chiếu n7.docx và đề xuất thêm
+## Dữ liệu được giữ ở đâu
 
-Đã đọc bản n7.docx hiện có. Chương 2.4, 3 và phần use case đã nêu tạo/cập nhật/hủy đơn, thanh toán thành công/thất bại/hoàn tiền. TC-24 đã đề xuất gửi lại request/event để tránh trùng; TC-28 đã có ghi đồng thời. Vì vậy các thao tác này không được tính là ý tưởng mới của đề án.
+- `frontend/src/services/shopProducts.json`: tên, ảnh, mô tả, giá và thông số mẫu.
+- `frontend/src/services/shopClient.ts`: giỏ, thông tin nhận hàng mẫu, lịch sử đơn và các lần thanh toán được lưu bằng localStorage, tách theo tài khoản và chế độ chạy.
+- `POST /api/shop/events`: gửi sự kiện tới backend ở chế độ thường. Backend xác thực JWT, lấy người thực hiện từ phiên đăng nhập, kiểm tra cấu trúc và ghi ba bản Audit Log hiện có trong Cassandra. Không nhận danh tính, phân quyền hoặc địa chỉ nhận hàng từ payload nhật ký.
+- Các sự kiện cửa hàng gồm `ADD_TO_CART`, `REMOVE_FROM_CART`, `UPDATE_CART`, `CREATE_ORDER`, `CANCEL_ORDER`, `PAYMENT_SUCCESS`, `PAYMENT_FAILED`.
+- Giỏ/đơn cục bộ chỉ cập nhật sau khi API xác nhận nhật ký. Khi API lỗi, giao diện giữ trạng thái trước thao tác và cho thử lại. Ghi localStorage và ghi Audit Log là hai thao tác riêng, không có bảo đảm giao dịch nguyên tử hoặc đồng bộ nhiều tab/máy.
+- Nhật ký được đánh dấu `simulated: true`, `source: BROWSER_SHOP`. Số tiền và kết quả do giao diện mô phỏng cung cấp, không phải bằng chứng giao dịch ngân hàng hoặc giá bán được máy chủ xác nhận. Thanh toán không thu tiền.
 
-| Phần cụ thể hóa thêm cho trải nghiệm bán hàng | Trạng thái |
-| --- | --- |
-| Giỏ hàng có nhiều sản phẩm, thay đổi số lượng, xóa và tính tổng | Đã làm; ADD_TO_CART / REMOVE_FROM_CART / UPDATE_CART |
-| Lưu giỏ và lịch sử đơn theo tài khoản qua nhiều phiên | Đã làm; hai bảng Cassandra mới |
-| Từ chối/timeout rồi thử trả tiền lại trên cùng đơn | Đã làm; mở rộng cách trình diễn PAYMENT_FAILED / PAYMENT_SUCCESS đã có |
-| Tài khoản B thử xem/trả tiền/hủy đơn của A | Đã kiểm thử API: đều 404; minh họa quyền sở hữu tài nguyên |
-| Bấm đặt hàng/thanh toán lặp lại không sinh giao dịch trùng | Đã kiểm thử, áp dụng TC-24 vào nghiệp vụ; giới hạn một backend demo |
+## Cassandra và bỏ bảng cũ
 
-Các tình huống bán hàng chưa được đặc tả thành luồng riêng trong n7.docx, nên ưu tiên tiếp nếu mở rộng:
+Ứng dụng chỉ cần năm bảng nền tảng: `audit_logs`, `audit_logs_by_service_level`, `audit_logs_by_id`, `services`, `users`. Hai bảng cửa hàng không còn được khởi tạo hoặc đọc/ghi. API giỏ/đơn cũ đã gỡ, chỉ còn endpoint ghi sự kiện.
 
-1. **Mã giảm giá hết hạn hoặc chưa đạt giá trị đơn tối thiểu**: nhập mã trong giỏ, hiển thị lý do không áp dụng; `COUPON_REJECTED` mức WARN. Đây là lỗi nghiệp vụ dễ hiểu cho người xem.
-2. **Hai người cùng mua sản phẩm cuối cùng**: người thứ hai nhận thông báo hết hàng; `OUT_OF_STOCK` mức WARN. Cần thêm tồn kho và điều kiện ghi phù hợp, chưa triển khai trong bản này. Khác với TC-28 vốn kiểm tra nhiều log được ghi.
-3. **Đổi số lượng sau khi giá sản phẩm thay đổi**: hiển thị giá mới và yêu cầu xác nhận trước đặt hàng; `PRICE_CHANGED` mức WARN. Cần phiên bản giá/danh mục có thể sửa, chưa triển khai.
+Với database của phiên bản trước, chạy `npm run db:remove-shop-tables` tại backend để bỏ riêng `shop_carts` và `shop_orders`. Lệnh này không chạy tự động khi mở ứng dụng; không xóa tài khoản, dịch vụ hoặc Audit Log. CQL tương đương ở `database/07_remove_legacy_shop.cql`.
 
-## Dữ liệu và giới hạn
+Đã khôi phục WSL từ ổ đĩa gốc ở F: dưới tên `AuditFlow-Recovered` và xóa thành công hai bảng cũ ngày 27/10. Kiểm tra schema xác nhận còn đúng năm bảng nền tảng. Đã thao tác mua hàng trên API thật và đọc lại đủ bốn sự kiện ở cả ba bảng Audit Log; giỏ/đơn chỉ có trong trình duyệt.
 
-- Danh mục bốn mặt hàng mẫu nằm trong source backend, giá VND được tính ở máy chủ; phía khách chỉ gửi ID và số lượng 1–10. Ảnh và thông số là minh họa.
-- `shop_carts`: partition theo user_id; `shop_orders`: partition theo user_id, clustering order_id. Payload JSON chứa snapshot mặt hàng, giá, trạng thái, địa chỉ mẫu và lịch sử thanh toán. Các bảng này không áp dụng TTL của Audit Log. Mẫu CQL: `database/07_shop.cql`.
-- Mỗi thay đổi nghiệp vụ được gửi cùng ba bản Audit Log trong Cassandra logged batch. Đây là cơ chế hoàn tất/replay của Cassandra, không phải giao dịch SQL có rollback/isolation. Timeout cần đọc lại dữ liệu; UUID đơn và lần trả tiền giúp retry cùng yêu cầu.
-- Hàng đợi theo tài khoản chỉ bảo vệ một tiến trình backend đang chạy. Chưa có distributed lock, tồn kho thật, hoàn tiền thật, cổng thanh toán, vận chuyển hay phân trang lịch sử đơn quy mô lớn.
-- Thanh toán không thu tiền, không gọi ngân hàng và không nhận thông tin thẻ. Địa chỉ không đưa vào details Audit Log. Nên dùng nút điền dữ liệu mẫu.
-- `npm run verify:shop` ở backend: **80 kiểm tra đạt**, gồm giá phía máy chủ, giỏ lưu DB, request lặp/đồng thời, retry, hủy, cách ly hai người dùng và đối chiếu cả ba bảng audit. Kết quả: `docs/shop-verification.json`. Tài khoản, giỏ và đơn kiểm thử tạm được dọn; audit kiểm thử được giữ.
-- Đã kiểm tra trên giao diện thật: chọn tai nghe, số lượng 2, điền địa chỉ mẫu, tạo đơn `1dd562de-74e7-4c27-a8de-ec1681a25020`, trả tiền bị từ chối rồi thử thành công, tải lại lịch sử vẫn còn đơn.
-- Tunnel vẫn chưa mở. Thay đổi này phục vụ bản chạy cục bộ.
+## Kiểm chứng
 
-Đã đối chiếu trên giao diện Admin: PAYMENT_SUCCESS của đơn 1dd562de-74e7-4c27-a8de-ec1681a25020, số tiền 2.580.000 VND, attempt=2, người thực hiện user. Ảnh NepStore-admin-audit.jpg lưu tại gốc.
-Ảnh sản phẩm được tạo bằng ImageGen tích hợp; prompt và đường dẫn ở docs/PRODUCT_IMAGES.md.
+`npm run test:shop` kiểm tra mô phỏng cục bộ, tách tài khoản/chế độ, yêu cầu lặp, thanh toán, hủy và đường HTTP ghi nhật ký bằng dependency thử riêng. `npm run test:audit` kiểm tra batch và lỗi ghi. Phạm vi và kết quả hiện hành ở `docs/TESTING.md`; kết quả giỏ/đơn lưu Cassandra ngày 22/10 là lịch sử của bản cũ.
 
+Ảnh mẫu ở `frontend/public/products`; nguồn và prompt ở `docs/PRODUCT_IMAGES.md`. Bản xem thử bằng `START_UI_PREVIEW.bat` mô phỏng cả Audit Log trong trình duyệt và có banner riêng; chế độ thường gửi nhật ký tới Cassandra thật, không tự chuyển sang nhật ký giả khi mất DB.
