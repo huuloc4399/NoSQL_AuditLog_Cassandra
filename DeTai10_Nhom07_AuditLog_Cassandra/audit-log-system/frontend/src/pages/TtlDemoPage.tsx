@@ -1,3 +1,9 @@
+/**
+ * [BAREM 3, 4] Giao diện quan sát TTL; frontend không tự xóa bản ghi Cassandra.
+ * handleCreateTtlLog gọi API tạo log; queryCassandraDirectly gọi API đọc TTL từ DB.
+ * Đếm lùi cục bộ chỉ để hiển thị; bằng chứng bảo vệ là SELECT trước hạn và 0 dòng sau hạn.
+ * Nếu mất kết nối, kiểm tra health/CQLSH trước khi kết luận log đã hết hạn.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -31,30 +37,30 @@ export const TtlDemoPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  // State configuration
+  // Cấu hình thời hạn và trạng thái hiển thị của lần demo.
   const [ttlConfig, setTtlConfig] = useState<number>(30);
   const [phase, setPhase] = useState<DemoPhase>('idle');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [autoSync, setAutoSync] = useState<boolean>(true);
 
-  // Active Demo Log data
+  // Giữ UUID và dữ liệu log vừa tạo để đối chiếu đúng một sự kiện trong database.
   const [activeLog, setActiveLog] = useState<AuditLog | null>(null);
   const [logId, setLogId] = useState<string>('');
   const [cassandraRemainingTtl, setCassandraRemainingTtl] = useState<number | null>(null);
   const [localSecondsLeft, setLocalSecondsLeft] = useState<number>(30);
   const [lastCheckedAt, setLastCheckedAt] = useState<string>('');
 
-  // Modals & Notifications
+  // Trạng thái hộp chi tiết và thông báo cho người thao tác.
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
-  // Interval references
+  // Tham chiếu timer để hủy khi tạo lại demo hoặc rời màn hình.
   const localTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Clean intervals on unmount
+  // Hủy timer khi rời trang, tránh tiếp tục gọi API cho màn hình đã đóng.
   useEffect(() => {
     return () => {
       if (localTimerRef.current) clearInterval(localTimerRef.current);
@@ -62,11 +68,11 @@ export const TtlDemoPage: React.FC = () => {
     };
   }, []);
 
-  // STEP 1: Create TTL Log
+  // [BAREM 3] Bước 1: yêu cầu backend ghi log với USING TTL, mặc định 30 giây.
   const handleCreateTtlLog = async () => {
     try {
       setIsCreating(true);
-      // Reset state
+      // Dọn timer của lần demo trước; không thực hiện DELETE trong Cassandra.
       if (localTimerRef.current) clearInterval(localTimerRef.current);
       if (syncTimerRef.current) clearInterval(syncTimerRef.current);
 
@@ -85,7 +91,7 @@ export const TtlDemoPage: React.FC = () => {
         type: 'success',
       });
 
-      // Start local ticking interval (1 second)
+      // Đồng hồ hiển thị mỗi giây; không quyết định bản ghi còn hay hết hạn trong DB.
       localTimerRef.current = setInterval(() => {
         setLocalSecondsLeft((prev) => {
           if (prev <= 1) {
@@ -95,7 +101,7 @@ export const TtlDemoPage: React.FC = () => {
         });
       }, 1000);
 
-      // Start real Cassandra polling every 2 seconds
+      // Đọc lại trạng thái qua backend mỗi hai giây để quan sát TTL thật.
       startCassandraPolling(newLog.log_id);
     } catch (err: any) {
       setToast({
@@ -107,7 +113,7 @@ export const TtlDemoPage: React.FC = () => {
     }
   };
 
-  // STEP 2 & 3: Poll / Query Cassandra directly using TTL(message)
+  // [BAREM 3, 4] Bước 2-3: gọi HTTP tới backend; backend mới SELECT TTL(message) trong Cassandra.
   const queryCassandraDirectly = async (idToCheck: string) => {
     if (!idToCheck) return;
     try {
@@ -121,7 +127,7 @@ export const TtlDemoPage: React.FC = () => {
           setActiveLog(status.data);
         }
       } else {
-        // Record has EXPIRED in Cassandra
+        // API trả found=false/expired; cần kiểm tra kết nối khi đánh giá kết quả demo.
         setCassandraRemainingTtl(0);
         setLocalSecondsLeft(0);
         setPhase('expired');
@@ -144,7 +150,7 @@ export const TtlDemoPage: React.FC = () => {
     }, 2000);
   };
 
-  // Reset demo
+  // Chỉ đặt lại màn hình và timer; log đã tạo vẫn hết hạn theo TTL của Cassandra.
   const handleReset = () => {
     if (localTimerRef.current) clearInterval(localTimerRef.current);
     if (syncTimerRef.current) clearInterval(syncTimerRef.current);
@@ -161,7 +167,7 @@ export const TtlDemoPage: React.FC = () => {
     setTimeout(() => setCopiedId(false), 2000);
   };
 
-  // Progress percentage (0% = expired, 100% = fresh)
+  // Tỷ lệ hiển thị của thanh đếm; việc xác nhận hết hạn vẫn cần kết quả từ API/DB.
   const progressPercent = Math.max(0, Math.min(100, Math.round((localSecondsLeft / ttlConfig) * 100)));
 
   return (
@@ -174,7 +180,7 @@ export const TtlDemoPage: React.FC = () => {
       />
 
       <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
-        {/* Banner with Architecture Context */}
+        {/* Giải thích ngữ cảnh TTL trong kiến trúc */}
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-100 to-emerald-500/10 dark:from-amber-500/10 dark:via-slate-800/60 dark:to-emerald-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">
@@ -211,7 +217,7 @@ export const TtlDemoPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 5-Step Process Visualizer */}
+        {/* Minh họa năm bước quan sát TTL */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 rounded-xl bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs shadow-sm">
           <div
             className={`p-2.5 rounded-lg border flex flex-col gap-1 transition ${
@@ -274,11 +280,11 @@ export const TtlDemoPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Content Layout */}
+        {/* Bố cục nội dung trình diễn */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Interactive Demo Controls & Countdown (7 cols) */}
+          {/* Cột trái: tạo log, đếm lùi và kiểm tra trạng thái */}
           <div className="lg:col-span-7 space-y-6">
-            {/* CARD 1: Trigger / Create */}
+            {/* Điều khiển tạo sự kiện có TTL */}
             <div className="p-6 rounded-2xl bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 shadow-xl">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
@@ -376,7 +382,7 @@ export const TtlDemoPage: React.FC = () => {
               </div>
             </div>
 
-            {/* CARD 2: Active Countdown & Real-Time Cassandra Verification */}
+            {/* Theo dõi thời gian và phản hồi Cassandra qua API */}
             {phase !== 'idle' && (
               <div
                 className={`p-6 rounded-2xl border transition-all duration-300 shadow-xl ${
@@ -420,7 +426,7 @@ export const TtlDemoPage: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Big Visual Countdown Gauge */}
+                {/* Đồng hồ đếm lùi hỗ trợ quan sát */}
                 <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center my-4">
                   {phase === 'active' ? (
                     <>
@@ -435,7 +441,7 @@ export const TtlDemoPage: React.FC = () => {
                         </span>
                       </p>
 
-                      {/* Dynamic Progress Bar */}
+                      {/* Thanh tiến độ theo thời gian hiển thị */}
                       <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden mt-4">
                         <div
                           className={`h-full transition-all duration-1000 ${
@@ -463,7 +469,7 @@ export const TtlDemoPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Real-time Cassandra Check Controls */}
+                {/* Các nút yêu cầu backend đọc TTL thật */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                   <div className="flex items-center gap-2">
                     <button
@@ -502,7 +508,7 @@ export const TtlDemoPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Identity Metadata Box */}
+                {/* Thông tin định danh để đối chiếu bản ghi */}
                 <div className="mt-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Cassandra Log ID:</span>
@@ -542,9 +548,9 @@ export const TtlDemoPage: React.FC = () => {
             )}
           </div>
 
-          {/* Right Column: Real CQL Code & Examiner Defense Guide (5 cols) */}
+          {/* Cột phải: mẫu CQL và nội dung giải thích khi bảo vệ */}
           <div className="lg:col-span-5 space-y-6">
-            {/* CQL Statements in Action */}
+            {/* Minh họa các câu CQL tương ứng */}
             <div className="p-6 rounded-2xl bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 shadow-xl">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
@@ -597,7 +603,7 @@ WHERE log_id = ${logId ? logId.slice(0, 18) + '...' : '?'};`}
               </div>
             </div>
 
-            {/* Teacher / Defense Points */}
+            {/* Các điểm cần trình bày khi bảo vệ */}
             <div className="p-6 rounded-2xl bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
@@ -648,7 +654,7 @@ WHERE log_id = ${logId ? logId.slice(0, 18) + '...' : '?'};`}
         </div>
       </div>
 
-      {/* Log Detail Modal */}
+      {/* Chi tiết sự kiện TTL đang quan sát */}
       {isDetailModalOpen && activeLog && (
         <LogDetailModal
           log={activeLog}
@@ -657,7 +663,7 @@ WHERE log_id = ${logId ? logId.slice(0, 18) + '...' : '?'};`}
         />
       )}
 
-      {/* Toast Notification */}
+      {/* Thông báo thao tác */}
       {toast && (
         <Toast
           message={toast.message}

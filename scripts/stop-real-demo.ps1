@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path -Parent $PSScriptRoot
 $stateDir = Join-Path $taskRoot '.runtime'
+& (Join-Path $PSScriptRoot 'stop-ngrok-demo.ps1')
 & (Join-Path $PSScriptRoot 'stop-share-demo.ps1')
 foreach ($name in @('frontend', 'backend')) {
     $recordPath = Join-Path $stateDir "$name.process.json"

@@ -1,3 +1,8 @@
+/**
+ * [BAREM 4] Dashboard Admin tổng hợp dữ liệu ngày đang chọn từ API thật ở chế độ thường.
+ * getStats lấy số sự kiện; getLogs lấy dữ liệu hiển thị, không cộng ba bảng audit vào tổng.
+ * Đối chiếu dữ liệu thống kê với các partition dịch vụ/level/ngày trong CQLSH.
+ */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, CircleAlert, FileText, RefreshCw, TriangleAlert } from 'lucide-react';

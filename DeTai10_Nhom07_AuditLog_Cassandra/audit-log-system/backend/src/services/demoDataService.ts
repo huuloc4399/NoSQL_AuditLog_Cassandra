@@ -1,3 +1,9 @@
+/**
+ * [BAREM 4] Chuẩn bị 48 log của ngày UTC hiện tại: 4 dịch vụ x 12 mẫu.
+ * Mỗi dịch vụ có 6 INFO, 3 WARN, 3 ERROR; đây là phần bổ sung, khác bộ khởi tạo 400 log.
+ * Mẫu đặt lúc 00:00 UTC nên khi demo lọc cả ngày hoặc để trống bộ lọc giờ.
+ * TTL 7 ngày của mẫu hôm nay khác TTL 30 giây của màn hình bảo vệ.
+ */
 import { v5 as uuidv5 } from 'uuid';
 import { getCassandraClient, cassandra } from '../config/cassandra.js';
 import { serviceCatalogService } from './serviceCatalogService.js';
@@ -5,7 +11,7 @@ import { auditLogService } from './auditLogService.js';
 
 let preparation: Promise<{ date: string; added: number; existing: number; skipped: string[] }> | null = null;
 
-// One fixed UUID per day/service/slot makes repeat preparation safe in the local demo.
+// UUID cố định theo ngày/dịch vụ/vị trí giúp lần chuẩn bị sau nhận diện mẫu đã có.
 export function prepareTodayDemoData() {
   if (preparation) return preparation;
   preparation = prepare().finally(() => { preparation = null; });
@@ -30,8 +36,8 @@ async function prepare() {
       const actions = { Auth: 'LOGIN_SUCCESS', User: 'UPDATE_USER', Order: 'CREATE_ORDER', Payment: 'PAYMENT_SUCCESS' };
       await auditLogService.createLog({ service_name: service, level,
         action: level === 'ERROR' ? `${service.toUpperCase()}_DEMO_ERROR` : actions[service as keyof typeof actions],
-        // Stable full primary key also prevents duplicate rows if CLI and web prepare concurrently.
-        // A midnight sample timestamp is always within today's UTC partition and never in the future.
+        // Giữ cả khóa đầy đủ ổn định để các lần chuẩn bị cùng mẫu ghi về cùng một hàng.
+        // Mốc đầu ngày thuộc đúng partition UTC hiện tại và không nằm trong tương lai.
         log_id: id, log_time: new Date(midnight),
         user_id: 'demo_sample', message: `[Dữ liệu mẫu ${date}] ${service} ${level} #${i + 1}`,
         details: { demo_sample: true, sample_date: date, scenario: `${service}/${level}`, slot: i, prepared_at: now.toISOString() },

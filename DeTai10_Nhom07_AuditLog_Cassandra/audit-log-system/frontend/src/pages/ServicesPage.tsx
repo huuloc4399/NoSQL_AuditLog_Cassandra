@@ -1,3 +1,9 @@
+/**
+ * [BAREM 2, 4] Màn hình Admin thao tác CRUD danh mục services.
+ * Luồng: biểu mẫu -> servicesApi -> ServiceController -> services và ba bản Audit Log.
+ * Khi bảo vệ: thêm/sửa/xóa một dịch vụ thử, refresh DbGate/CQLSH sau mỗi thao tác.
+ * Nhật ký tương ứng nằm ở service_name=User; việc xóa danh mục không xóa nhật ký.
+ */
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Header } from '../components/Header';
@@ -23,14 +29,14 @@ export const ServicesPage: React.FC = () => {
   const [pageError, setPageError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Modals state
+  // Trạng thái các hộp thêm, sửa và xác nhận xóa.
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [activeService, setActiveService] = useState<ServiceItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form fields
+  // Dữ liệu biểu mẫu gửi tới API quản trị danh mục.
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formStatus, setFormStatus] = useState(true);
@@ -89,6 +95,7 @@ export const ServicesPage: React.FC = () => {
     setIsDeleteOpen(true);
   };
 
+  // [BAREM 2] Chỉ thông báo thành công sau khi API xác nhận; API có lỗi thì giữ thông tin lỗi.
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
@@ -114,6 +121,7 @@ export const ServicesPage: React.FC = () => {
     }
   };
 
+  // [BAREM 2] Gửi UUID của dịch vụ đang chọn, không dùng vị trí dòng trên bảng làm khóa.
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeService) return;
@@ -136,6 +144,7 @@ export const ServicesPage: React.FC = () => {
     }
   };
 
+  // [BAREM 4] Xác nhận xóa trên UI, sau đó đối chiếu DELETE_SERVICE trong bảng audit.
   const handleDelete = async () => {
     if (!activeService) return;
 
@@ -163,7 +172,7 @@ export const ServicesPage: React.FC = () => {
       />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1">
-        {/* Page Error Banner */}
+        {/* Thông báo lỗi tải danh mục */}
         {pageError && (
           <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 flex items-center justify-between gap-3 text-xs animate-in fade-in">
             <div className="flex items-center gap-2.5">
@@ -181,7 +190,7 @@ export const ServicesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Action Header */}
+        {/* Tiêu đề và nút thao tác */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -203,7 +212,7 @@ export const ServicesPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Services Table */}
+        {/* Danh sách dịch vụ đọc từ API */}
         <div className="rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-colors duration-200">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs min-w-[700px]">
@@ -294,7 +303,7 @@ export const ServicesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Service Modal */}
+      {/* Hộp thêm dịch vụ */}
       {isAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl overflow-hidden p-6 transition-colors duration-200">
@@ -369,7 +378,7 @@ export const ServicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Service Modal */}
+      {/* Hộp sửa dịch vụ */}
       {isEditOpen && activeService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl overflow-hidden p-6 transition-colors duration-200">
@@ -442,7 +451,7 @@ export const ServicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal using ConfirmModal */}
+      {/* Xác nhận trước khi gọi API xóa dịch vụ */}
       <ConfirmModal
         isOpen={isDeleteOpen}
         title="Delete Microservice"
@@ -455,7 +464,7 @@ export const ServicesPage: React.FC = () => {
         onCancel={() => setIsDeleteOpen(false)}
       />
 
-      {/* Global Toast Container */}
+      {/* Vùng thông báo kết quả thao tác */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

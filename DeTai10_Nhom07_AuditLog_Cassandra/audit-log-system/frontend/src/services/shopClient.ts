@@ -1,3 +1,8 @@
+/**
+ * [BAREM 4] Mô phỏng nghiệp vụ mua hàng ở trình duyệt để tạo sự kiện Audit Log.
+ * Khóa localStorage tách theo user_id và api/preview; không đồng bộ đơn giữa các máy.
+ * Trình duyệt có thể sửa/xóa localStorage nên không dùng trạng thái/số tiền này làm chứng từ thật.
+ */
 import { products, type ItemSnapshot } from './shopCatalog';
 
 type Item = { product_id: string; quantity: number };
@@ -31,8 +36,8 @@ export function priceItems(items: Item[]): ItemSnapshot[] {
   });
 }
 
-// Both normal mode and preview use the same local simulation. Only audit delivery differs.
-// Browser state and remote audit are separate writes, not a database transaction.
+// Chế độ thường và preview dùng chung mô phỏng cục bộ, khác nơi nhận sự kiện audit.
+// Lưu localStorage và ghi audit là hai thao tác riêng, không phải một giao dịch nguyên tử.
 export function createShopClient(owner: string, mode: 'api' | 'preview', storage: Store, emit: (event: ShopEvent) => Promise<unknown>) {
   const key = `nep-shop-ui-${mode}-${owner}`;
   let queue: Promise<unknown> = Promise.resolve();
@@ -58,7 +63,8 @@ export function createShopClient(owner: string, mode: 'api' | 'preview', storage
       const signature = JSON.stringify(event);
       const event_id = pending.get(signature) || crypto.randomUUID();
       pending.set(signature, event_id);
-      // Check local write access before sending an event; keep prior state on audit failure.
+      // Kiểm tra khả năng ghi cục bộ trước, chờ audit được xác nhận rồi lưu trạng thái mới.
+      // API lỗi thì giữ trạng thái cũ; nếu lần lưu cuối lỗi, audit có thể đã tồn tại trong DB.
       storage.setItem(key, storage.getItem(key) || JSON.stringify({ cart: [], orders: [] }));
       await emit({ ...event, event_id } as ShopEvent);
       storage.setItem(key, JSON.stringify(state));

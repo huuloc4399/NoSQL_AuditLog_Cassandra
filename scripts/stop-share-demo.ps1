@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+& (Join-Path $PSScriptRoot 'stop-demo-supervisor.ps1')
 $taskRoot = Split-Path -Parent $PSScriptRoot
 foreach ($name in @('cloudflare-tunnel', 'share-server')) {
     $recordPath = Join-Path $taskRoot ".runtime\$name.process.json"

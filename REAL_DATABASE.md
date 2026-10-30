@@ -1,4 +1,16 @@
-# Khôi phục khởi động ngày 27 tháng 10 năm 2026
+# Cập nhật ổ dữ liệu ngày 30 tháng 10 năm 2026
+
+Máy này hiện dùng WSL **AuditFlow-Local**, tài khoản Linux `traffic`, ổ VHD tại `D:\NOSQL_NHOM7_AuditLog_Cassandra\.runtime\wsl-local\ext4.vhdx` trên SSD nội bộ. Các file BAT tự đọc `.runtime/wsl-config.json`; tiếp tục chạy START_REAL_DEMO.bat như trước.
+
+Đã xác định ổ USB F phát sinh lỗi đọc/ghi (Windows Disk Event 51). Cassandra báo `Input/output error` tại `conf/triggers`, rồi `Read-only file system` và tự dừng transport. Đồng thời các dump Java/WSL lớn làm đầy ổ C. Đổi mật khẩu cần ghi người dùng và audit nên làm lỗi lưu trữ bộc lộ; không khắc phục bằng cách bỏ ghi audit.
+
+Đã sao chép nguyên VHD sang D, phục hồi journal trên bản sao bằng e2fsck và chạy kiểm tra lại với exit 0 theo [hướng dẫn phục hồi VHD của Microsoft](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error). Bản gốc trên F vẫn được giữ nguyên. Log kiểm tra, checksum bản sao trước sửa và các dump được lưu riêng trong `.runtime/recovery-20261030`. Không đưa `.runtime` lên GitHub.
+
+Đã chuyển các dump sang D để giải phóng khoảng 11,8 GiB trên C và đặt `maxCrashDumpCount=1` trong `%UserProfile%\.wslconfig` theo [cấu hình WSL](https://learn.microsoft.com/en-us/windows/wsl/wsl-config). Cấu hình này có phạm vi toàn WSL. START_REAL_DEMO kiểm tra dung lượng ổ hệ thống, launcher kiểm tra khả năng ghi/fsync trước khi chạy Cassandra, và chờ API reconnect sau khi DB mở cổng. Foreground Cassandra được ghi PID để dừng sạch bằng SIGTERM, không khởi chạy trùng.
+
+Đã thử trên tài khoản tạm: 5 lần đổi mật khẩu, mật khẩu cũ bị từ chối, mật khẩu mới đăng nhập được; 5 sự kiện CHANGE_PASSWORD tồn tại đủ trong 3 bảng audit, không chứa mật khẩu. Theo dõi thêm 120 giây: 123 kiểm tra health thành công, 0 lần mất kết nối. Tài khoản thử đã được xóa; các tài khoản hiện có không bị đổi mật khẩu.
+
+# Lịch sử khôi phục khởi động ngày 27 tháng 10 năm 2026
 
 Ổ đĩa Ubuntu gốc hiện ở `F:\BigData\traffic_rebuild\runtime\wsl\Ubuntu-22.04\ext4.vhdx`; đăng ký WSL cũ vẫn tham chiếu ổ D nên không khởi động được. Đã dùng `wsl --import-in-place` để đăng ký chính ổ đĩa hiện có dưới tên `AuditFlow-Recovered`, giữ dữ liệu và tài khoản Linux `traffic`. Không cài lại hoặc khởi tạo database mới.
 

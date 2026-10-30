@@ -63,8 +63,8 @@ export const demoAdapter: AxiosAdapter = async config => {
     log.details = JSON.stringify({ source: 'BROWSER_DEMO', simulated: true, owner_user_id: actor.user_id, resource_id: `DEMO-${actor.user_id}` });
     return ok({ auditLog: log }, 'Đã tạo sự kiện mẫu cho tài khoản hiện tại', 201);
   }
-  const readable = method === 'get' && (path === '/logs' || /^\/logs\/(stats\/summary|detail|[a-f0-9-]+)$/.test(path) || path === '/auth/me');
-  if (!readable && !path.startsWith('/auth/') && actor.role !== 'ADMIN') fail('Chức năng này chỉ dành cho Admin.', 403);
+  // Chế độ xem thử áp dụng cùng quyền đọc nhật ký như API thật.
+  if (!path.startsWith('/auth/') && actor.role !== 'ADMIN') fail('Chức năng này chỉ dành cho Admin.', 403);
   if (path === '/auth/me') return ok({ user: safe(actor) });
   if (path === '/auth/logout') { event('Auth', 'LOGOUT', 'INFO', 'Đăng xuất bản demo', actor.username); sessionStorage.removeItem(token); return ok(null); }
   if (path === '/auth/change-password' && method === 'put') { if (body.old_password !== actor.password) fail('Mật khẩu hiện tại không đúng.'); if (String(body.new_password || '').length < 8 || body.new_password === actor.password) fail('Mật khẩu mới cần ít nhất 8 ký tự và khác mật khẩu hiện tại.'); actor.password = body.new_password; event('Auth', 'CHANGE_PASSWORD', 'INFO', 'Đổi mật khẩu thành công', actor.username); return ok(null); }

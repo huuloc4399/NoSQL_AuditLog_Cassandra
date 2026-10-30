@@ -1,0 +1,41 @@
+.cql-console-launcher{position:fixed;right:24px;bottom:22px;z-index:121;display:inline-flex;align-items:center;gap:9px;min-height:46px;padding:12px 18px;border:1px solid var(--border);border-radius:14px;background:var(--accent);color:var(--panel);box-shadow:0 6px 24px #102e2226;font:inherit;font-size:13px;font-weight:600}
+.cql-console-launcher.is-open{background:var(--panel);color:var(--text)}
+.cql-console{position:fixed;right:24px;bottom:82px;z-index:120;width:min(760px,calc(100vw - 48px));height:min(680px,calc(100dvh - 112px));display:flex;flex-direction:column;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:16px;box-shadow:0 18px 70px #082c2633;overflow:hidden}
+.cql-console-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.cql-console-header>div{display:flex;align-items:center;gap:12px}
+.cql-console-icon{display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--border);border-radius:11px;background:var(--soft);color:var(--accent)}
+.cql-console-header h2{font-size:15px;font-weight:650;margin:0 0 4px}
+.cql-console-header p{font-size:11px;color:var(--muted);margin:0}
+.cql-console-header p span{margin:0 4px}
+.cql-console-body{display:flex;flex-direction:column;gap:13px;padding:18px 20px 20px;min-height:0;overflow-y:auto}
+.cql-console-presets{display:flex;gap:12px;flex-wrap:wrap}
+.cql-console-presets label{display:flex;flex:1;flex-direction:column;gap:7px;font-size:11px;font-weight:600;min-width:155px}
+.cql-console-presets label:first-child{flex:2}
+.cql-console-presets select,.cql-console-presets input{width:100%;min-height:38px;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--page);color:var(--text);font:inherit;font-weight:400;font-size:12px}
+.cql-console-presets .cql-console-uuid{flex:2;min-width:250px}
+.cql-editor-label{display:flex;justify-content:space-between;gap:10px;font-size:11px;font-weight:600}
+.cql-editor-label span{font-weight:400;color:var(--muted);font-size:10px}
+.cql-editor{position:relative;background:#122820;border:1px solid #29463b;border-radius:9px;flex-shrink:0}
+.cql-editor-prompt{position:absolute;top:13px;left:12px;color:#6bd5ab;font:12px/1.7 'Consolas',monospace}
+.cql-editor textarea{display:block;resize:vertical;width:100%;height:166px;min-height:100px;max-height:300px;padding:12px 14px 12px 53px;border:0;border-radius:9px;background:transparent;color:#e2f1e8;font:12px/1.7 'Consolas','Courier New',monospace;tab-size:2;outline-offset:2px}
+.cql-console-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0}
+.cql-console-actions>span{margin-right:auto;color:var(--muted);font-size:10px}
+.cql-console-actions .button{font-size:12px;min-height:36px}
+.cql-console-output{border:1px solid var(--border);border-radius:9px;min-height:140px;flex-shrink:0;overflow:hidden}
+.cql-output-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;background:var(--page);border-bottom:1px solid var(--border);font-size:11px}
+.cql-output-heading strong{font-weight:600}
+.cql-output-heading>span{font-size:10px;color:var(--muted)}
+.cql-console-empty,.cql-empty-result{font-size:12px;color:var(--muted);line-height:1.8;padding:16px;margin:0}
+.cql-result-scroll{max-height:290px;overflow:auto;overscroll-behavior:contain}
+.cql-result-table{border-collapse:collapse;width:100%;font:11px/1.6 'Consolas',monospace;text-align:left}
+.cql-result-table th,.cql-result-table td{border-bottom:1px solid var(--border);padding:10px 12px;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;min-width:110px;max-width:360px}
+.cql-result-table th{font-weight:600;white-space:nowrap;background:var(--soft);position:sticky;top:0}
+.cql-result-table td{color:var(--text)}
+.cql-result-table tr:last-child td{border-bottom:0}
+.cql-null{color:var(--muted);font-style:italic}
+.cql-schema-output{padding:14px;margin:0;overflow:auto;max-height:290px;color:var(--text);font:11px/1.7 'Consolas',monospace;background:var(--panel)}
+.cql-output-note{padding:9px 13px;margin:0;font-size:11px;color:var(--muted);background:var(--soft);line-height:1.6}
+.cql-console-error{display:flex;align-items:flex-start;gap:8px;color:#b13b34;background:#fff0ee;padding:13px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.cql-console-error svg{flex-shrink:0;margin-top:2px}
+html.dark .cql-console-error{background:#39251f;color:#ffb1a6}
+@media(max-width:600px){.cql-console-launcher{right:16px;bottom:16px;min-height:44px;padding:10px 14px}.cql-console{right:12px;bottom:74px;width:calc(100vw - 24px);height:min(700px,calc(100dvh - 90px))}.cql-console-header{padding:13px 14px}.cql-console-body{padding:14px;gap:12px}.cql-console-presets label{min-width:125px}.cql-console-presets label:first-child{flex-basis:100%}.cql-console-presets .cql-console-uuid{min-width:100%}.cql-console-actions{flex-wrap:wrap}.cql-console-actions>span{width:100%;font-size:10px}.cql-editor textarea{font-size:12px;height:180px;padding-left:45px}.cql-editor-prompt{left:8px}.cql-output-heading{flex-wrap:wrap;gap:5px}.cql-editor-label span{font-size:9px}}

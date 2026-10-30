@@ -27,3 +27,6 @@ scratch_*
 ~$*
 .DS_Store
 Thumbs.db
+DeTai10_Nhom07_AuditLog_Cassandra/audit-log-system/backend/src/services/auditLogService.ts
+.gitignore
+Slide_Nhom7.pptx

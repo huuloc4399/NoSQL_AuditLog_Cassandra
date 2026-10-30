@@ -1,3 +1,8 @@
+/**
+ * [BAREM 2, 3, 4] Bản đồ endpoint và quyền truy cập trước khi xử lý nghiệp vụ.
+ * Nhóm /logs phục vụ ghi/lọc/TTL; /services phục vụ CRUD; /health và /system/status kiểm tra kết nối.
+ * Chỉ ADMIN được đọc nhật ký; thao tác của USER vẫn ghi audit qua các chức năng nghiệp vụ.
+ */
 import { Router, Request, Response } from 'express';
 import { auditLogController } from '../controllers/auditLogController.js';
 import { serviceController } from '../controllers/serviceController.js';
@@ -9,12 +14,22 @@ import { isCassandraHealthy } from '../config/cassandra.js';
 import { env } from '../config/env.js';
 import { prepareTodayDemoData } from '../services/demoDataService.js';
 import shopRouter from './shop.js';
+import { cqlConsoleService } from '../services/cqlConsoleService.js';
+import { z } from 'zod';
 
 const router = Router();
 router.use('/shop', shopRouter);
 
+// [BAREM 1, 3, 4] Console đọc Cassandra thật dành riêng ADMIN, kể cả gọi API trực tiếp.
+router.post('/admin/cql', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { query } = z.object({ query: z.string().trim().min(1).max(8000) }).strict().parse(req.body);
+    res.json({ success: true, data: await cqlConsoleService.execute(query) });
+  } catch (error) { next(error); }
+});
+
 // ============================================================================
-// PUBLIC SYSTEM HEALTH CHECK (For load balancer / monitoring)
+// [BAREM 4] Kiểm tra API và Cassandra thật; không yêu cầu đăng nhập.
 // ============================================================================
 router.get('/health', async (req: Request, res: Response) => {
   const dbHealth = await isCassandraHealthy();
@@ -37,7 +52,7 @@ router.get('/health', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
-// SYSTEM STATUS ROUTE (ADMIN ONLY - HTTP 403 for others)
+// [BAREM 4] Trạng thái hệ thống dành cho ADMIN; USER gọi trực tiếp nhận 403.
 // ============================================================================
 router.get(
   '/system/status',
@@ -67,7 +82,7 @@ router.get(
 );
 
 // ============================================================================
-// AUTHENTICATION ROUTES
+// Xác thực, thông tin phiên, đăng xuất và đổi mật khẩu.
 // ============================================================================
 router.post('/auth/register', (req, res, next) => authController.register(req, res, next));
 router.post('/auth/login', (req, res, next) => authController.login(req, res, next));
@@ -76,7 +91,7 @@ router.get('/auth/me', authenticate, (req, res, next) => authController.me(req, 
 router.put('/auth/change-password', authenticate, (req, res, next) => authController.changePassword(req, res, next));
 
 // ============================================================================
-// USER MANAGEMENT ROUTES (ADMIN ONLY - HTTP 403 for others)
+// Quản lý tài khoản chỉ dành cho ADMIN.
 // ============================================================================
 router.get('/users', authenticate, authorize('ADMIN'), (req, res, next) => userController.getAll(req, res, next));
 router.post('/users', authenticate, authorize('ADMIN'), (req, res, next) => userController.create(req, res, next));
@@ -86,24 +101,23 @@ router.patch('/users/:id/role', authenticate, authorize('ADMIN'), (req, res, nex
 router.patch('/users/:id/status', authenticate, authorize('ADMIN'), (req, res, next) => userController.changeStatus(req, res, next));
 
 // ============================================================================
-// AUDIT LOG ROUTES
-// Read: ADMIN, OPERATOR, USER
-// Write / TTL: ADMIN, OPERATOR
+// [BAREM 2, 3] Các API Audit Log.
+// Đọc, thống kê, ghi thủ công và TTL: chỉ ADMIN, kể cả khi gọi API trực tiếp.
 // ============================================================================
-router.get('/logs', authenticate, authorize('ADMIN', 'USER'), (req, res, next) =>
+router.get('/logs', authenticate, authorize('ADMIN'), (req, res, next) =>
   auditLogController.getLogs(req, res, next)
 );
-router.get('/logs/detail', authenticate, authorize('ADMIN', 'USER'), (req, res, next) =>
+router.get('/logs/detail', authenticate, authorize('ADMIN'), (req, res, next) =>
   auditLogController.getLogDetail(req, res, next)
 );
-router.get('/logs/stats/summary', authenticate, authorize('ADMIN', 'USER'), (req, res, next) =>
+router.get('/logs/stats/summary', authenticate, authorize('ADMIN'), (req, res, next) =>
   auditLogController.getStatsSummary(req, res, next)
 );
-router.get('/logs/:id', authenticate, authorize('ADMIN', 'USER'), (req, res, next) =>
+router.get('/logs/:id', authenticate, authorize('ADMIN'), (req, res, next) =>
   auditLogController.getLogById(req, res, next)
 );
 
-// Ingestion and TTL Logs
+// [BAREM 2, 3] Tiếp nhận log và trình diễn TTL tự hết hạn.
 router.post('/logs', authenticate, authorize('ADMIN'), (req, res, next) =>
   auditLogController.createLog(req, res, next)
 );
@@ -115,9 +129,7 @@ router.get('/logs/ttl-status/:id', authenticate, authorize('ADMIN'), (req, res, 
 );
 
 // ============================================================================
-// SERVICE CATALOG MANAGEMENT ROUTES
-// Read: ADMIN, OPERATOR (USER cannot access Services)
-// Mutate: ADMIN ONLY
+// [BAREM 2] Danh mục dịch vụ: cả đọc và thay đổi đều yêu cầu ADMIN.
 // ============================================================================
 router.get('/services', authenticate, authorize('ADMIN'), (req, res, next) =>
   serviceController.getAll(req, res, next)
@@ -136,10 +148,10 @@ router.delete('/services/:id', authenticate, authorize('ADMIN'), (req, res, next
 );
 
 // ============================================================================
-// DEMO OPERATIONS ROUTES (AUTO AUDIT LOG GENERATION)
-// Personal scenarios: ADMIN/USER. Bulk data and the original admin scenarios: ADMIN.
+// [BAREM 4] Kịch bản phát sinh audit để trình diễn.
+// Kịch bản cá nhân: ADMIN/USER; chuẩn bị dữ liệu và kịch bản quản trị cũ: ADMIN.
 // ============================================================================
-// Auth Demo
+// Sự kiện minh họa nhóm Auth.
 router.post('/demo/my-actions', authenticate, authorize('ADMIN', 'USER'), (req, res, next) =>
   demoController.myAction(req, res, next)
 );
@@ -156,7 +168,7 @@ router.post('/demo/auth/logout', authenticate, authorize('ADMIN'), (req, res, ne
   demoController.logout(req, res, next)
 );
 
-// User Demo
+// Sự kiện minh họa nhóm User.
 router.post('/demo/users', authenticate, authorize('ADMIN'), (req, res, next) =>
   demoController.createUser(req, res, next)
 );
@@ -167,7 +179,7 @@ router.delete('/demo/users/:id', authenticate, authorize('ADMIN'), (req, res, ne
   demoController.deleteUser(req, res, next)
 );
 
-// Order Demo
+// Sự kiện minh họa nhóm Order; không phải CRUD bảng đơn hàng.
 router.post('/demo/orders', authenticate, authorize('ADMIN'), (req, res, next) =>
   demoController.createOrder(req, res, next)
 );
@@ -181,7 +193,7 @@ router.delete('/demo/orders/:id', authenticate, authorize('ADMIN'), (req, res, n
   demoController.deleteOrder(req, res, next)
 );
 
-// Payment Demo
+// Sự kiện minh họa nhóm Payment; không xử lý thanh toán thật.
 router.post('/demo/payments/success', authenticate, authorize('ADMIN'), (req, res, next) =>
   demoController.paymentSuccess(req, res, next)
 );

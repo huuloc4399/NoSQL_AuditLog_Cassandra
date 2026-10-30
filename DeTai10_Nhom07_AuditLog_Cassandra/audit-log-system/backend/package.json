@@ -14,6 +14,7 @@
     "demo:ttl": "tsx scripts/runTtlDemo.ts",
     "test": "tsx tests/runTests.ts",
     "test:rbac": "tsx tests/rbac.http.test.ts",
+    "test:cql": "tsx tests/cqlConsole.test.ts",
     "seed:demo": "tsx scripts/generateDummyData.ts --if-empty",
     "verify:database": "tsx scripts/verifyRealDatabase.ts",
     "seed:today": "tsx scripts/prepareTodayDemo.ts",

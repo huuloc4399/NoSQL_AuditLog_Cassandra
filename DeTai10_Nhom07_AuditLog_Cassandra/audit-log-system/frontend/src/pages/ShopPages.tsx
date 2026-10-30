@@ -1,3 +1,9 @@
+/**
+ * [BAREM 4 - Bối cảnh demo] Cửa hàng giúp User tạo các sự kiện có ý nghĩa nghiệp vụ.
+ * Sản phẩm tĩnh; giỏ/đơn/thông tin nhận hàng ở trình duyệt, không phải bảng Cassandra.
+ * ShopClient gửi /api/shop/events để backend ghi audit; trả tiền lỗi tạo Payment/ERROR.
+ * Để chứng minh CRUD dữ liệu thật theo barem, dùng màn hình Dịch vụ hoặc Tài khoản.
+ */
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode, FormEvent } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, CreditCard, Headphones, Leaf, LogOut, Minus, Package, Plus, Search, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, Truck, UserRound, X } from 'lucide-react';
@@ -48,7 +54,7 @@ function StoreShell() {
     {DEMO_MODE && <div className="demo-banner">CHẾ ĐỘ XEM THỬ · Dữ liệu lưu trên trình duyệt, chưa kết nối Cassandra.</div>}
     <header className="shop-header"><Link to="/" className="shop-brand" aria-label="Nếp Store, trang chủ"><Leaf size={28}/><span>nếp<span>store</span><small>ĐỒ HAY CHO MỖI NGÀY</small></span></Link>
       <nav aria-label="Cửa hàng"><NavLink to="/" end>Sản phẩm</NavLink><NavLink to="/orders">Đơn hàng của tôi</NavLink></nav>
-      <div className="shop-header-actions"><details className="shop-account"><summary aria-label="Tài khoản"><UserRound size={20}/><span>{user?.full_name || user?.username}</span></summary><div><Link to="/profile">Thông tin tài khoản</Link><Link to="/logs">Nhật ký hoạt động</Link><button onClick={() => void logout()}><LogOut size={16}/>Đăng xuất</button></div></details><Link className="shop-cart-link" to="/cart" aria-label={`Giỏ hàng (${count})`}><ShoppingBag size={23}/><b>{count}</b></Link></div>
+      <div className="shop-header-actions"><details className="shop-account"><summary aria-label="Tài khoản"><UserRound size={20}/><span>{user?.full_name || user?.username}</span></summary><div><Link to="/profile">Thông tin tài khoản</Link><button onClick={() => void logout()}><LogOut size={16}/>Đăng xuất</button></div></details><Link className="shop-cart-link" to="/cart" aria-label={`Giỏ hàng (${count})`}><ShoppingBag size={23}/><b>{count}</b></Link></div>
     </header>
     {error && <div className="shop-alert error" role="alert">{error}<button onClick={() => void load()}>Thử lại</button></div>}
     {notice && <div className="shop-alert success" role="status"><Check size={17}/>{notice}<Link to="/cart">Xem giỏ hàng</Link><button aria-label="Đóng thông báo" onClick={clearNotice}><X size={16}/></button></div>}

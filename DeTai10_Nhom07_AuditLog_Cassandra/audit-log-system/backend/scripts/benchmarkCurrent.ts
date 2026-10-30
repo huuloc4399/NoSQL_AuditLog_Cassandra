@@ -1,3 +1,11 @@
+/**
+ * [BAREM 4] Đo hiệu năng thật bằng performance.now(), không dùng thời gian giả lập.
+ * PT-01..03: lần lượt 100/300/500 sự kiện, mỗi sự kiện một batch ba bảng.
+ * PT-04..06: mỗi mẫu truy vấn chạy 50 lần; báo trung bình, P95, throughput và số lỗi.
+ * Các thao tác chạy tuần tự trên một máy; không phải bài tải đồng thời hoặc chịu lỗi nhiều node.
+ * Keyspace audit_log_benchmark tách khỏi dữ liệu ứng dụng; log thử có TTL 3.600 giây.
+ * Chạy npm run test:perf; kết quả nằm trong docs/PERFORMANCE.md và performance-results.json.
+ */
 import { performance } from 'node:perf_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,6 +20,8 @@ type Metric = { id: string; name: string; operations: number; success: number; f
 const metrics: Metric[] = [];
 const round = (n: number) => Number(n.toFixed(2));
 
+// Mỗi mẫu là thời gian client chờ một thao tác; latency gồm cả đường truyền tới WSL.
+// P95 lấy phần tử ở mốc 95% sau khi sắp xếp; lỗi được đếm riêng, không giả thành thành công.
 async function measure(id: string, name: string, operations: number, work: (i: number) => Promise<number>) {
   const samples: number[] = []; let failed = 0; let rows = 0;
   const begin = performance.now();
@@ -46,6 +56,7 @@ async function main() {
       return 3;
     });
   }
+  // [BAREM 3, 4] Đối chiếu ba kiểu khóa truy vấn: dịch vụ/ngày, thêm level và dải giờ.
   const queries = [
     ['PT-04', 'Service + date', `SELECT * FROM ${keyspace}.audit_logs WHERE service_name=? AND log_date=? LIMIT 100`, [service, date]],
     ['PT-05', 'Service + level + date', `SELECT * FROM ${keyspace}.audit_logs_by_service_level WHERE service_name=? AND level=? AND log_date=? LIMIT 100`, [service, 'INFO', date]],
@@ -59,6 +70,7 @@ async function main() {
     });
   }
   const server = (await client.execute('SELECT cluster_name,release_version,data_center FROM system.local')).first();
+  // Lưu cả môi trường và ngày đo để không dùng kết quả cũ như số đo của lần chạy mới.
   const report = { status: metrics.every(m => m.failed === 0) ? 'COMPLETED' : 'FAILED', executed_at: new Date().toISOString(),
     environment: { client_platform: process.platform, node_version: process.version,
       server_runtime: 'Ubuntu 22.04 / WSL2', cassandra_version: server.release_version,

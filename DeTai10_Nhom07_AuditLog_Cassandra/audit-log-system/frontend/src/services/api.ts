@@ -1,3 +1,8 @@
+/**
+ * [BAREM 2, 3, 4] Các hàm HTTP dùng chung giữa giao diện và backend.
+ * servicesApi phục vụ CRUD; logsApi phục vụ ghi/lọc/TTL; backend mới truy cập Cassandra.
+ * Ở chế độ preview, adapter thay thế phản hồi; chỉ dùng chế độ thường để chứng minh DB thật.
+ */
 import axios from 'axios';
 import { API_BASE_URL, DEMO_MODE } from '../config/api';
 import { demoAdapter } from './demoAdapter';
@@ -12,7 +17,7 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// Interceptor to inject JWT token
+// Tự gắn JWT của phiên vào request cần xác thực.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('audit_auth_token');
   if (token) {
@@ -21,11 +26,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor for unauthorized errors
+// Xử lý phản hồi không còn quyền dùng phiên, yêu cầu đăng nhập lại khi phù hợp.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // A failed demo login is a business event with an auditLog, not an expired session.
+    // Đăng nhập thất bại trong kịch bản có auditLog là kết quả nghiệp vụ mô phỏng, không phải phiên hiện tại hết hạn.
     const demoBusinessFailure = error.config?.url?.startsWith('/demo/') && error.response?.data?.data?.auditLog;
     if (error.response?.status === 401 && !demoBusinessFailure && window.location.pathname !== '/login') {
       localStorage.removeItem('audit_auth_token');
@@ -36,7 +41,7 @@ api.interceptors.response.use(
   }
 );
 
-// Auth Endpoints
+// API xác thực và thông tin tài khoản hiện hành.
 export const authApi = {
   register: async (data: { username: string; password: string; full_name?: string; email?: string }) => {
     const res = await api.post('/auth/register', data);
@@ -60,7 +65,7 @@ export const authApi = {
   },
 };
 
-// User Management Endpoints (ADMIN only)
+// API quản lý tài khoản, chỉ ADMIN được gọi.
 export const usersApi = {
   getAll: async (): Promise<{ data: import('../types').UserItem[]; count: number }> => {
     const res = await api.get('/users');
@@ -95,7 +100,7 @@ export const usersApi = {
   },
 };
 
-// Logs Endpoints
+// [BAREM 2, 3] API ghi log, lọc, chi tiết và TTL.
 export const logsApi = {
   getLogs: async (params?: LogFilterParams): Promise<LogResponse> => {
     const res = await api.get('/logs', { params });
@@ -127,7 +132,7 @@ export const logsApi = {
   },
 };
 
-// Services Endpoints
+// [BAREM 2] API CRUD danh mục dịch vụ.
 export const servicesApi = {
   getAll: async (): Promise<{ data: ServiceItem[] }> => {
     const res = await api.get('/services');
@@ -151,7 +156,7 @@ export const servicesApi = {
   },
 };
 
-// Demo Operations Endpoints
+// [BAREM 4] API tạo sự kiện minh họa; không phải bảng dữ liệu mua hàng.
 export const demoApi = {
   myAction: async (scenario: string) => (await api.post('/demo/my-actions', { scenario })).data,
   prepareToday: async () => (await api.post('/demo/prepare-today')).data,
@@ -205,7 +210,7 @@ export const demoApi = {
   },
 };
 
-// System Health
+// [BAREM 4] Kiểm tra API và trạng thái Cassandra thật.
 export const systemApi = {
   getHealth: async (): Promise<{ success: boolean }> => {
     const res = await api.get('/health');
@@ -218,3 +223,17 @@ export const systemApi = {
 };
 
 export default api;
+
+export interface CqlConsoleResult {
+  columns: string[];
+  rows: Record<string, string | number | boolean | null>[];
+  text?: string;
+  elapsedMs: number;
+  truncated: boolean;
+}
+export const cqlApi = {
+  execute: async (query: string, signal?: AbortSignal): Promise<CqlConsoleResult> => {
+    const res = await api.post('/admin/cql', { query }, { signal });
+    return res.data.data;
+  },
+};

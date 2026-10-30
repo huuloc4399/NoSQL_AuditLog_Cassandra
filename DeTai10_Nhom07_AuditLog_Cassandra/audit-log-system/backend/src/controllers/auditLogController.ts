@@ -1,3 +1,8 @@
+/**
+ * [BAREM 2, 3] Cầu nối HTTP -> kiểm tra dữ liệu -> AuditLogService -> phản hồi JSON.
+ * POST /logs phục vụ API tiếp nhận; GET /logs phục vụ lọc; /ttl-demo và /ttl-status phục vụ TTL.
+ * Quyền ADMIN/USER được kiểm tra tại routes/index.ts trước khi vào controller.
+ */
 import { Request, Response, NextFunction } from 'express';
 import { auditLogService } from '../services/auditLogService.js';
 import { createLogSchema, queryLogSchema, isValidUuid } from '../validators/auditLogValidator.js';
@@ -5,7 +10,7 @@ import { AppError } from '../middleware/errorHandler.js';
 
 export class AuditLogController {
   /**
-   * POST /api/logs - Create audit log entry manually with validation & multi-table write
+   * [BAREM 2] POST /api/logs: kiểm tra payload rồi chờ ghi đủ các bảng audit.
    */
   async createLog(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -15,6 +20,7 @@ export class AuditLogController {
         log_id: req.body.log_id || (typeof idempotencyKey === 'string' && isValidUuid(idempotencyKey) ? idempotencyKey : undefined),
       };
 
+      // Dữ liệu thiếu/sai level/thời gian hoặc nhận diện nhạy cảm bị chặn trước khi ghi DB.
       const validatedData = createLogSchema.parse(rawBody);
       const logRecord = await auditLogService.createLog({
         ...validatedData,
@@ -32,7 +38,7 @@ export class AuditLogController {
   }
 
   /**
-   * GET /api/logs - Query audit logs with Query-First partition routing and cursor pagination
+   * [BAREM 3] GET /api/logs: kiểm tra bộ lọc và gửi cursor cho lớp truy vấn.
    */
   async getLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -64,7 +70,7 @@ export class AuditLogController {
   }
 
   /**
-   * GET /api/logs/:id - Point query audit log by UUID (O(1) lookup)
+   * GET /api/logs/:id: đọc chi tiết bằng UUID để đối chiếu web với database.
    */
   async getLogById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -96,7 +102,7 @@ export class AuditLogController {
   }
 
   /**
-   * GET /api/logs/detail - Get specific audit log by composite key (for backwards compatibility)
+   * Đường dẫn đọc chi tiết bằng khóa tổng hợp; giữ tương thích với client cũ.
    */
   async getLogDetail(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -132,7 +138,7 @@ export class AuditLogController {
   }
 
   /**
-   * GET /api/logs/stats/summary - Dashboard summary statistics
+   * [BAREM 4] GET /api/logs/stats/summary: thống kê sự kiện của ngày đang xem.
    */
   async getStatsSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -150,10 +156,11 @@ export class AuditLogController {
   }
 
   /**
-   * POST /api/logs/ttl-demo - Insert a record with TTL = 30 seconds for live demo
+   * [BAREM 3, 4] Tạo log Auth/WARN riêng, mặc định TTL 30 giây; không gắn TTL lên dữ liệu cũ.
    */
   async createTtlDemoLog(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      // Sau phản hồi 201, sao chép data.log_id để SELECT TTL(message) ngay trong CQLSH.
       const ttlSeconds = req.body.ttl ? Number(req.body.ttl) : 30;
       const logRecord = await auditLogService.createLog({
         service_name: 'Auth',
@@ -181,7 +188,7 @@ export class AuditLogController {
   }
 
   /**
-   * GET /api/logs/ttl-status/:id - Real-time Cassandra TTL inspection
+   * [BAREM 3] Đọc trạng thái từ Cassandra; đồng hồ frontend chỉ hỗ trợ quan sát.
    */
   async getTtlStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

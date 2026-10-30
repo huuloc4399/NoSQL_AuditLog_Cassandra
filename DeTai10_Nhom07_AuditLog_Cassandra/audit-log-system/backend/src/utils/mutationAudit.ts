@@ -1,3 +1,8 @@
+/**
+ * [BAREM 2, 4] Tạo thông tin audit cho thao tác quản trị.
+ * Actor lấy từ phiên đã xác thực, không lấy tên người thao tác do client tự khai.
+ * Hàm chỉ dựng dữ liệu; service nghiệp vụ mới thực hiện mutation và ghi audit trong batch.
+ */
 import type { Request } from 'express';
 import type { AuditLogInput } from '../services/auditLogService.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';

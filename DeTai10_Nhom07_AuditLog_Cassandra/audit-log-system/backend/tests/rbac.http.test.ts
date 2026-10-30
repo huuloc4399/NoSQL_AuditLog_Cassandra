@@ -16,9 +16,14 @@ const records: Record<string, User> = {
   user: { ...base, user_id: '22222222-2222-4222-8222-222222222222', username: 'user', role: 'USER' },
   disabled: { ...base, user_id: '33333333-3333-4333-8333-333333333333', username: 'disabled', role: 'ADMIN', status: 'INACTIVE' },
 };
-const originals = { find: userService.findByUsername, all: userService.getAllUsers, create: userService.createUser, log: auditLogService.createLog };
+const originals = { find: userService.findByUsername, all: userService.getAllUsers, create: userService.createUser, log: auditLogService.createLog, query: auditLogService.queryLogs, detail: auditLogService.getLogById, summary: auditLogService.getDashboardSummary };
 let registrationRole: string | undefined;
 let lastPersonalLog: any;
+let auditReads = 0;
+const testLog = { log_id: '44444444-4444-4444-8444-444444444444', service_name: 'Order', log_date: '2026-10-30', log_time: '2026-10-30T00:00:00.000Z', level: 'INFO', action: 'CREATE_ORDER', user_id: 'user', message: 'Test audit' };
+auditLogService.queryLogs = async () => { auditReads++; return { logs: [testLog], count: 1, page_state: null } as any; };
+auditLogService.getLogById = async () => { auditReads++; return testLog as any; };
+auditLogService.getDashboardSummary = async () => { auditReads++; return { totalLogs: 1, byLevel: { INFO: 1 }, byService: { Order: 1 } } as any; };
 userService.findByUsername = async username => records[username] || null;
 userService.getAllUsers = async () => Object.values(records).map(userService.toSafeUser);
 userService.createUser = async data => { registrationRole = data.role; return { ...userService.toSafeUser(records.user), username: data.username }; };
@@ -44,7 +49,28 @@ try {
   await request('/users/target', 403, token('user'), 'DELETE');
   await request('/users', 200, token('admin'));
   await request('/auth/me', 200, token('user'));
-  await request('/logs?level=INVALID', 400, token('user'));
+  // Chặn cả URL danh sách, khóa tổng hợp, UUID và thống kê trước khi truy vấn audit.
+  const auditReadPaths = [
+    '/logs',
+    `/logs/${testLog.log_id}`,
+    `/logs/detail?service=Order&date=${testLog.log_date}&time=${encodeURIComponent(testLog.log_time)}&id=${testLog.log_id}`,
+    '/logs/stats/summary',
+  ];
+  for (const path of auditReadPaths) {
+    await request(path, 401);
+    const denied = await request(path, 403, token('user'));
+    assert.equal((await denied.json() as any).data, undefined);
+    await request(path, 403, token('user', 'ADMIN'));
+  }
+  await request('/logs?level=INVALID', 403, token('user'));
+  assert.equal(auditReads, 0); passed++;
+  for (const path of auditReadPaths) {
+    const result = await (await request(path, 200, token('admin'))).json() as any;
+    assert.equal(result.success, true);
+    assert.ok(result.data);
+  }
+  assert.equal(auditReads, auditReadPaths.length); passed++;
+  await request('/logs?level=INVALID', 400, token('admin'));
   // A forged role claim cannot override the role currently stored for this account.
   await request('/users', 403, token('user', 'ADMIN'));
   for (const role of ['OPERATOR', 'VIEWER', 'ROOT']) await request('/users', 400, token('admin'), 'POST', { username: 'newuser', password: 'password123', role });
@@ -68,6 +94,7 @@ try {
   console.log(`\n${passed} HTTP / RBAC checks passed. Cassandra was not used.`);
 } finally {
   userService.findByUsername = originals.find; userService.getAllUsers = originals.all; userService.createUser = originals.create; auditLogService.createLog = originals.log;
+  auditLogService.queryLogs = originals.query; auditLogService.getLogById = originals.detail; auditLogService.getDashboardSummary = originals.summary;
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
 }

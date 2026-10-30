@@ -1,3 +1,10 @@
+/**
+ * [BAREM 3, 4] Bản trình diễn TTL ở terminal: tạo một log 30 giây, đọc TTL rồi đọc lại sau hạn.
+ * Đây là thao tác INSERT vào Cassandra thật; sự kiện thử sẽ tự hết hạn ở ba bảng audit.
+ * Trên máy WSL hiện tại, mở START_REAL_DEMO.bat rồi chạy npm run demo:ttl trong backend.
+ * Thông báo hướng dẫn Docker bên dưới là thông báo cũ; môi trường demo hiện dùng WSL.
+ * Thời gian đếm trên console không thay cho việc xác nhận kết quả SELECT/TTL(message).
+ */
 import { getCassandraClient, cassandra, connectCassandra, closeCassandra } from '../src/config/cassandra.js';
 import { auditLogService } from '../src/services/auditLogService.js';
 

@@ -1,3 +1,9 @@
+/**
+ * [BAREM 2, 3, 4] Luồng trung tâm ghi, lọc và kiểm chứng Audit Log.
+ * createLog -> ba INSERT chung UUID/thời gian -> logged batch -> phản hồi API.
+ * querySingleDay chọn bảng theo bộ lọc; getTtlStatus đọc TTL(message) trong DB.
+ * Khi bảo vệ, đối chiếu UUID từ web với CQLSH; hướng dẫn ở docs/GIAI_THICH_CODE_THEO_BAREM.md.
+ */
 import { getCassandraClient, cassandra } from '../config/cassandra.js';
 import { serviceCatalogService } from './serviceCatalogService.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -13,9 +19,9 @@ export interface AuditLogInput {
   ip_address?: string | null;
   details?: any;
   log_time?: Date | string | null;
-  ttl?: number | null; // TTL in seconds
-  log_id?: string | null; // Optional client-supplied UUID for idempotency
-  internal?: boolean; // Trusted control-plane events; not accepted by the ingestion schema.
+  ttl?: number | null; // Thời hạn tính bằng giây; có giá trị thì thêm USING TTL vào INSERT.
+  log_id?: string | null; // UUID tùy chọn; không đồng nghĩa chống trùng tuyệt đối qua mọi lần khởi động.
+  internal?: boolean; // Sự kiện điều khiển nội bộ; schema tiếp nhận log bên ngoài không nhận cờ này.
 }
 
 export interface AuditLogRecord {
@@ -36,10 +42,10 @@ export interface QueryFilter {
   service?: string;
   level?: 'INFO' | 'WARN' | 'ERROR';
   date?: string; // YYYY-MM-DD
-  start_date?: string; // YYYY-MM-DD (Multi-day partition query)
-  end_date?: string;   // YYYY-MM-DD (Multi-day partition query)
-  from?: string; // HH:mm, HH:mm:ss, or ISO timestamp
-  to?: string;   // HH:mm, HH:mm:ss, or ISO timestamp
+  start_date?: string; // YYYY-MM-DD: ngày đầu của truy vấn nhiều phân vùng.
+  end_date?: string;   // YYYY-MM-DD: ngày cuối của truy vấn nhiều phân vùng.
+  from?: string; // Giờ UTC dạng HH:mm, HH:mm:ss hoặc timestamp ISO.
+  to?: string;   // Giờ UTC dạng HH:mm, HH:mm:ss hoặc timestamp ISO.
   limit?: number;
   page_state?: string | null;
 }
@@ -50,7 +56,8 @@ export interface QueryResult {
   count: number;
 }
 
-// In-memory sliding window cache for duplicate event deduplication (10-second TTL)
+// Cache chống trùng 10 giây trong một tiến trình, khác với TTL lưu dữ liệu của Cassandra.
+// Mất cache khi backend khởi động lại; không dùng để cam kết exactly-once.
 interface CachedEvent {
   timestamp: number;
   record: AuditLogRecord;
@@ -68,7 +75,7 @@ function cleanDuplicateCache(): void {
 
 export class AuditLogService {
   /**
-   * Helper to format a Date into UTC YYYY-MM-DD for deterministic partition keys
+   * [BAREM 1] Tạo ngày UTC thống nhất; tránh UI và backend đọc hai partition khác ngày.
    */
   private formatDateToYMD(d: Date): string {
     const year = d.getUTCFullYear();
@@ -78,7 +85,7 @@ export class AuditLogService {
   }
 
   /**
-   * Helper to convert Date or YYYY-MM-DD string to cassandra.types.LocalDate
+   * Đổi ngày sang kiểu LocalDate của driver trước khi truyền vào điều kiện partition key.
    */
   private toCassandraLocalDate(dateStrOrObj: string | Date): cassandra.types.LocalDate {
     if (typeof dateStrOrObj === 'string') {
@@ -92,7 +99,7 @@ export class AuditLogService {
   }
 
   /**
-   * Safe encoding of Cassandra pageState to base64 string
+   * Đóng gói pageState của driver thành chuỗi để client gửi lại khi tải trang sau.
    */
   private encodePageState(pageState: any): string | null {
     if (!pageState) return null;
@@ -113,7 +120,7 @@ export class AuditLogService {
   }
 
   /**
-   * Decode client cursor string (handles base64 compound cursor, hex pageState, or base64 pageState)
+   * Giải mã cursor của ứng dụng hoặc pageState của Cassandra; không phân trang bằng OFFSET.
    */
   private decodeCursor(cursor: string | null | undefined): {
     isCompound: boolean;
@@ -143,16 +150,16 @@ export class AuditLogService {
   }
 
   /**
-   * Dual/Triple Write: Inserts an audit log into audit_logs, audit_logs_by_service_level, and audit_logs_by_id
-   * Guarantees identical log_id, timestamp, and TTL across all query-first tables.
+   * [BAREM 2] Ghi cùng một sự kiện vào audit_logs, audit_logs_by_service_level và audit_logs_by_id.
+   * Dùng chung log_id, tham số log_time và giá trị TTL cho các bản sao theo truy vấn.
    */
   async createLog(input: AuditLogInput, mutations: { query: string; params: any[] }[] = []): Promise<AuditLogRecord> {
     const trimmedServiceName = input.service_name.trim();
 
-    // 1. Check if Service is registered and active
+    // Bước 1: xác nhận dịch vụ đã đăng ký và có được phép tiếp nhận sự kiện hay không.
     const serviceStatus = await serviceCatalogService.isServiceActive(trimmedServiceName);
     if (!serviceStatus.exists) {
-      // Auto-register service as active if it's one of the standard services, or reject
+      // Tự tạo một trong bốn nhóm chuẩn nếu thiếu; tên dịch vụ khác phải được đăng ký trước.
       const standardServices = ['Auth', 'User', 'Order', 'Payment'];
       if (standardServices.includes(trimmedServiceName)) {
         await serviceCatalogService.createService({
@@ -167,7 +174,7 @@ export class AuditLogService {
       throw new AppError(`Service '${trimmedServiceName}' is currently INACTIVE. Cannot accept new audit logs.`, 400);
     }
 
-    // 2. Duplicate Event Handling (Idempotency check)
+    // Bước 2: nhận diện yêu cầu lặp bằng fingerprint trong cửa sổ cache 10 giây.
     cleanDuplicateCache();
     const dedupeFingerprint = `${trimmedServiceName}:${input.level}:${input.action}:${input.user_id || ''}:${input.message}:${input.log_id || ''}`;
     if (mutations.length === 0 && duplicateEventCache.has(dedupeFingerprint)) {
@@ -178,11 +185,11 @@ export class AuditLogService {
       }
     }
 
-    // 3. Sensitive Data Masking before storage
+    // Bước 3: che dữ liệu nhạy cảm trên đường ghi nội bộ trước khi đưa vào CQL.
     const maskedMessage = maskSensitiveText(input.message.trim());
     const sanitizedDetails = sanitizeLogDetails(input.details);
 
-    // 4. Timestamp & UUID setup
+    // Bước 4: tạo UUID và thời điểm một lần để ba bảng cùng chỉ tới một sự kiện.
     const logTime = input.log_time
       ? (typeof input.log_time === 'string' ? new Date(input.log_time) : input.log_time)
       : new Date();
@@ -198,7 +205,7 @@ export class AuditLogService {
 
     const client = getCassandraClient();
 
-    // 5. Prepare CQL Statements for Query-First Tables
+    // [BAREM 1, 2] Bước 5: ba cách tổ chức khóa phục vụ ba mẫu đọc, không JOIN các bảng.
     let query1 = `
       INSERT INTO audit_log_system.audit_logs (
         service_name, log_date, log_time, log_id, level, action, user_id, ip_address, message, details
@@ -217,7 +224,9 @@ export class AuditLogService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    // Apply Cassandra Native TTL if provided
+    // [BAREM 3 - TTL] Thời hạn nằm trực tiếp trong INSERT của cả ba bảng.
+    // Nếu bỏ TTL ở một bảng thì sự kiện vẫn còn bản sao sau khi hai bảng khác hết hạn.
+    // Kiểm chứng: SELECT TTL(message) theo UUID trước hạn, rồi đọc lại sau hơn 30 giây.
     if (input.ttl && input.ttl > 0) {
       query1 += ` USING TTL ${input.ttl}`;
       query2 += ` USING TTL ${input.ttl}`;
@@ -263,8 +272,9 @@ export class AuditLogService {
       sanitizedDetails || '',
     ];
 
-    // Logged batches retain the mutations for replay if a replica fails.
-    // Include the business mutation when supplied; never acknowledge a missing audit copy.
+    // [BAREM 2, 4] Gửi mutation nghiệp vụ (nếu có) cùng ba INSERT audit trong logged batch.
+    // Chỉ trả thành công sau await; batch không phải giao dịch SQL có rollback/isolation nhiều partition.
+    // Khi timeout, cần đọc lại trạng thái trước khi gửi lại vì server có thể đã ghi mutation.
     await client.batch([
       ...mutations,
       { query: query1, params: params1 },
@@ -286,7 +296,7 @@ export class AuditLogService {
       remaining_ttl: input.ttl || undefined,
     };
 
-    // Store in duplicate cache
+    // Chỉ thêm vào cache sau khi batch được xác nhận; lần ghi lỗi không được coi là đã lưu.
     duplicateEventCache.set(dedupeFingerprint, {
       timestamp: Date.now(),
       record,
@@ -296,21 +306,21 @@ export class AuditLogService {
   }
 
   /**
-   * Query logs based on query-first routing with Cassandra native cursor pagination
-   * Supports multi-day partition scatter-gather querying without ALLOW FILTERING
+   * [BAREM 3] Chọn bảng theo mẫu truy vấn và dùng cursor thay vì quét/lọc toàn bộ dữ liệu.
+   * Nhiều ngày được tách thành các partition ngày riêng rồi ghép kết quả ở backend.
    */
   async queryLogs(filter: QueryFilter): Promise<QueryResult> {
     const limit = filter.limit || 100;
 
-    // SCENARIO: Multi-day range query across discrete daily partitions
-    // In Cassandra, partition keys cannot be range-queried with >= or <=.
-    // Instead, the application generates discrete partition dates and executes parallel queries.
+    // [BAREM 3] log_date thuộc partition key nên không lọc dải ngày bằng >=/<= như log_time.
+    // Backend liệt kê từng ngày, truy vấn riêng và sắp xếp kết quả ghép.
+    // Nhánh nhiều ngày hiện trả tập kết quả giới hạn, không trả cursor trang tiếp.
     if (filter.start_date && filter.end_date && filter.start_date < filter.end_date) {
       const dates: string[] = [];
       const current = new Date(filter.start_date + 'T00:00:00Z');
       const end = new Date(filter.end_date + 'T00:00:00Z');
 
-      // Cap at 14 days to prevent excessive coordinator fan-out
+      // Giới hạn tối đa 14 ngày trong lần ghép này để không mở quá nhiều truy vấn song song.
       while (current <= end && dates.length < 14) {
         dates.push(this.formatDateToYMD(current));
         current.setUTCDate(current.getUTCDate() + 1);
@@ -343,7 +353,7 @@ export class AuditLogService {
   }
 
   /**
-   * Execute query for a single partition date
+   * [BAREM 3] Truy vấn trong một ngày UTC; chọn một hoặc nhiều partition theo bộ lọc.
    */
   async querySingleDay(filter: QueryFilter): Promise<QueryResult> {
     const client = getCassandraClient();
@@ -351,7 +361,7 @@ export class AuditLogService {
     const cassandraLocalDate = this.toCassandraLocalDate(targetDate);
     const limit = filter.limit || 100;
 
-    // Time boundaries (UTC consistent)
+    // Đổi giờ trên bộ lọc thành mốc UTC cùng ngày với log_date, tránh lệch múi giờ.
     let fromTimestamp: Date | null = null;
     let toTimestamp: Date | null = null;
 
@@ -379,10 +389,10 @@ export class AuditLogService {
       }
     }
 
-    // Decode cursor parameter (compound JSON or native Cassandra pageState)
+    // Đọc vị trí trang trước từ cursor ghép hoặc pageState của driver.
     const decodedCursor = this.decodeCursor(filter.page_state);
 
-    // Prepare execution options with native Cassandra cursor pagination
+    // fetchSize giới hạn trang đọc từ driver; prepare=true truyền tham số tách khỏi câu CQL.
     const execOptions: cassandra.QueryOptions = {
       prepare: true,
       fetchSize: limit,
@@ -391,8 +401,9 @@ export class AuditLogService {
       execOptions.pageState = decodedCursor.pageState;
     }
 
-    // SCENARIO 1: Query by Service + Level (Uses audit_logs_by_service_level)
-    // Partition key: ((service_name, level, log_date), log_time, log_id) -> 0 ALLOW FILTERING
+    // [BAREM 3] Có service và level: đọc audit_logs_by_service_level.
+    // Cung cấp đủ partition key (service_name, level, log_date), sau đó cắt dải log_time.
+    // Demo Payment + ERROR: UUID trên web phải khớp SELECT cùng điều kiện trong CQLSH.
     if (filter.service && filter.level) {
       let query = `
         SELECT service_name, level, log_date, log_time, log_id, action, user_id, ip_address, message, details, TTL(message) AS remaining_ttl
@@ -447,8 +458,8 @@ export class AuditLogService {
       };
     }
 
-    // SCENARIO 2: Query by Service only (Uses audit_logs)
-    // Partition key: ((service_name, log_date), log_time, log_id) -> 0 ALLOW FILTERING
+    // [BAREM 3] Chỉ có service: đọc audit_logs với partition key (service_name, log_date).
+    // log_time là clustering key nên dùng được >= và <= trong partition đã chọn.
     if (filter.service) {
       let query = `
         SELECT service_name, log_date, log_time, log_id, level, action, user_id, ip_address, message, details, TTL(message) AS remaining_ttl
@@ -503,15 +514,15 @@ export class AuditLogService {
       };
     }
 
-    // SCENARIO 3: Neither service nor level specified (or only level specified)
-    // Parallel query across known active services to avoid full cluster scan
+    // Chưa chọn service: truy vấn các dịch vụ đang bật, rồi ghép và sắp xếp tại backend.
+    // Nếu có level thì mỗi nhánh dùng bảng theo mức độ; không thêm ALLOW FILTERING.
     const services = await serviceCatalogService.getAllServices();
     let serviceNames = services.filter((s) => s.status).map((s) => s.service_name);
     if (serviceNames.length === 0) {
       serviceNames = ['Auth', 'User', 'Order', 'Payment'];
     }
 
-    // Fetch limit + 1 per service to accurately determine if next page exists
+    // Đọc dư một dòng mỗi dịch vụ để xét còn trang sau trong tập dữ liệu truy vấn.
     const perServiceLimit = limit + 1;
     const promises = serviceNames.map(async (srv) => {
       if (filter.level) {
@@ -581,7 +592,7 @@ export class AuditLogService {
   }
 
   /**
-   * Retrieve single log detail by direct log_id (O(1) point lookup) or composite key
+   * Tra cứu chi tiết bằng partition key log_id; giữ đường đọc theo khóa tổng hợp để tương thích.
    */
   async getLogById(
     logIdStr: string,
@@ -596,7 +607,7 @@ export class AuditLogService {
     const client = getCassandraClient();
     const logId = cassandra.types.Uuid.fromString(logIdStr);
 
-    // 1. Try direct point lookup on audit_logs_by_id table
+    // Ưu tiên bảng theo UUID; người demo chỉ cần sao chép log_id từ màn hình chi tiết.
     try {
       const pointQuery = `
         SELECT log_id, service_name, log_date, log_time, level, action, user_id, ip_address, message, details, TTL(message) AS remaining_ttl
@@ -621,10 +632,10 @@ export class AuditLogService {
         };
       }
     } catch {
-      // audit_logs_by_id may not exist on older clusters; proceed to fallback
+      // DB cũ có thể thiếu bảng theo UUID; thử đường đọc tương thích nếu đủ khóa.
     }
 
-    // 2. If composite key provided, query main audit_logs table
+    // Có đủ service/ngày/thời gian/UUID thì có thể đọc đúng hàng trong bảng chính.
     if (serviceName && dateStr && timeIso) {
       const cassandraLocalDate = this.toCassandraLocalDate(dateStr);
       const logTime = new Date(timeIso);
@@ -658,9 +669,9 @@ export class AuditLogService {
   }
 
   /**
-   * Real-time Cassandra TTL inspection.
-   * Returns exact remaining TTL from Cassandra's TTL(message) function,
-   * or marks the record as EXPIRED / PURGED if 0 rows are returned.
+   * [BAREM 3, 4] Đọc thời hạn còn lại bằng TTL(message) của Cassandra.
+   * Chỉ kết luận demo TTL đạt khi bản ghi có trước hạn và truy vấn sau hạn trả 0 dòng.
+   * Nhánh catch hiện cũng đi tới found=false; cần đối chiếu health/CQLSH để phân biệt lỗi kết nối.
    */
   async getTtlStatus(logIdStr: string): Promise<{
     found: boolean;
@@ -708,7 +719,8 @@ export class AuditLogService {
       console.warn(`[AuditLogService] Error querying audit_logs_by_id for TTL status: ${err.message}`);
     }
 
-    // Row does not exist in Cassandra -> It expired or was purged by TTL
+    // Điểm trả về khi không có dòng hoặc truy vấn bên trên lỗi.
+    // Với demo đã kiểm tra kết nối và từng đọc được UUID này, 0 dòng sau hạn là bằng chứng TTL.
     return {
       found: false,
       expired: true,
@@ -718,7 +730,7 @@ export class AuditLogService {
   }
 
   /**
-   * Retrieve Dashboard summary statistics
+   * [BAREM 4] Tổng hợp log theo dịch vụ/mức độ/ngày để giải thích dữ liệu trên Dashboard.
    */
   async getDashboardSummary(dateStr?: string): Promise<{
     totalLogs: number;
@@ -745,7 +757,8 @@ export class AuditLogService {
     let totalLogs = 0;
     const recentErrors: AuditLogRecord[] = [];
 
-    // Query each (service, level) partition in audit_logs_by_service_level without ALLOW FILTERING
+    // Đọc từng partition (dịch vụ, mức độ, ngày), cộng kết quả trong ứng dụng.
+    // Số liệu là số sự kiện ở bảng này, không cộng thêm hai bản sao audit khác.
     const partitionQueries = serviceNames.flatMap((srv) =>
       levels.map(async (lvl) => {
         const query = `
@@ -756,7 +769,7 @@ export class AuditLogService {
         const res = await client.execute(query, [srv, lvl, cassandraLocalDate], { prepare: true });
         const count = res.rowLength;
 
-        // Tally statistics
+        // Cộng số sự kiện theo dịch vụ và mức độ của ngày đang xem.
         byService[srv] = (byService[srv] || 0) + count;
         byLevel[lvl] = (byLevel[lvl] || 0) + count;
         totalLogs += count;
@@ -769,7 +782,7 @@ export class AuditLogService {
 
     await Promise.all(partitionQueries);
 
-    // Sort recent errors newest first
+    // Sắp xếp các lỗi gần đây theo thời gian giảm dần sau khi ghép các dịch vụ.
     recentErrors.sort((a, b) => new Date(b.log_time).getTime() - new Date(a.log_time).getTime());
 
     return {
@@ -784,7 +797,7 @@ export class AuditLogService {
   }
 
   /**
-   * Helper to map Cassandra rows to typed records
+   * Chuyển kiểu dữ liệu của Cassandra Driver thành bản ghi API dùng chung cho frontend.
    */
   private mapRows(rows: cassandra.types.Row[]): AuditLogRecord[] {
     return rows.map((row) => ({

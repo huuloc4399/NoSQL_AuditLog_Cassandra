@@ -1,12 +1,13 @@
 -- ============================================================================
--- SCRIPT 03: SEED INITIAL SERVICES INTO CATALOGUE
--- Initial 4 Microservices: Auth, User, Order, Payment
--- All set to Active (status = true)
+-- [BAREM 2, 4] Danh mục bốn nhóm sự kiện chuẩn để chuẩn bị dữ liệu demo.
+-- Auth, User, Order, Payment là nhãn dịch vụ; không phải bốn máy chủ triển khai độc lập.
+-- Cả bốn được đặt status=true. Script SQL dùng UUID cố định cho khởi tạo thủ công.
+-- Khi ứng dụng đã có danh mục, ưu tiên seed:demo có kiểm tra tồn tại trong backend.
 -- ============================================================================
 
 USE audit_log_system;
 
--- 1. Auth Service
+-- 1. Auth: sự kiện đăng nhập, đăng xuất và xác thực.
 INSERT INTO audit_log_system.services (
     service_id, service_name, description, status, created_at, updated_at
 ) VALUES (
@@ -18,7 +19,7 @@ INSERT INTO audit_log_system.services (
     toTimestamp(now())
 );
 
--- 2. User Service
+-- 2. User: thao tác tài khoản và quản trị danh mục.
 INSERT INTO audit_log_system.services (
     service_id, service_name, description, status, created_at, updated_at
 ) VALUES (
@@ -30,7 +31,7 @@ INSERT INTO audit_log_system.services (
     toTimestamp(now())
 );
 
--- 3. Order Service
+-- 3. Order: sự kiện thao tác giỏ/đơn mẫu.
 INSERT INTO audit_log_system.services (
     service_id, service_name, description, status, created_at, updated_at
 ) VALUES (
@@ -42,7 +43,7 @@ INSERT INTO audit_log_system.services (
     toTimestamp(now())
 );
 
--- 4. Payment Service
+-- 4. Payment: sự kiện kết quả thanh toán mô phỏng.
 INSERT INTO audit_log_system.services (
     service_id, service_name, description, status, created_at, updated_at
 ) VALUES (
@@ -54,5 +55,5 @@ INSERT INTO audit_log_system.services (
     toTimestamp(now())
 );
 
--- Verification Query
+-- Kiểm chứng: danh mục phải có đủ bốn tên chuẩn và trạng thái đang bật.
 SELECT service_id, service_name, status, description FROM audit_log_system.services;

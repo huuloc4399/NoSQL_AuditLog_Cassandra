@@ -68,7 +68,7 @@ export const App: React.FC = () => {
               <Route path="checkout" element={<ProtectedRoute allowedRoles={['USER']}><CheckoutPage/></ProtectedRoute>} />
               <Route path="orders" element={<ProtectedRoute allowedRoles={['USER']}><OrdersPage/></ProtectedRoute>} />
               <Route path="orders/:id" element={<ProtectedRoute allowedRoles={['USER']}><OrderPage/></ProtectedRoute>} />
-              <Route path="logs" element={<LogExplorerPage />} />
+              <Route path="logs" element={<ProtectedRoute allowedRoles={['ADMIN']}><LogExplorerPage /></ProtectedRoute>} />
               <Route path="profile" element={<ProfilePage />} />
 
               {/* Accessible by ADMIN */}

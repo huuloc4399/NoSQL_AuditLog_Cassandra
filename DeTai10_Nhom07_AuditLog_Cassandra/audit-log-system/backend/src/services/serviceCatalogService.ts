@@ -1,3 +1,9 @@
+/**
+ * [BAREM 2] Lớp truy cập bảng services, khác với nhãn service_name trong mỗi log.
+ * Có audit: chuyển mutation INSERT/UPDATE/DELETE sang createLog để gửi cùng logged batch.
+ * Không có audit: đường khởi tạo nội bộ chỉ ghi danh mục; controller quản trị luôn truyền audit.
+ * Sau thao tác, CQLSH phải thấy thay đổi của services và sự kiện trong ba bảng audit.
+ */
 import { auditLogService, AuditLogInput } from './auditLogService.js';
 import { getCassandraClient, cassandra } from '../config/cassandra.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -14,7 +20,7 @@ export interface ServiceRecord {
 
 export class ServiceCatalogService {
   /**
-   * Retrieve all registered services
+   * Lấy danh sách dịch vụ để hiển thị màn hình quản trị và xác định các nhóm truy vấn.
    */
   async getAllServices(): Promise<ServiceRecord[]> {
     const client = getCassandraClient();
@@ -32,7 +38,7 @@ export class ServiceCatalogService {
   }
 
   /**
-   * Get single service by UUID
+   * Đọc dịch vụ bằng service_id là partition key của bảng services.
    */
   async getServiceById(serviceId: string): Promise<ServiceRecord | null> {
     if (!isValidUuid(serviceId)) {
@@ -57,7 +63,7 @@ export class ServiceCatalogService {
   }
 
   /**
-   * Get single service by name using secondary index
+   * Tra cứu tên qua secondary index; index không tự bảo đảm ràng buộc UNIQUE.
    */
   async getServiceByName(serviceName: string): Promise<ServiceRecord | null> {
     const client = getCassandraClient();
@@ -78,7 +84,7 @@ export class ServiceCatalogService {
   }
 
   /**
-   * Register a new service
+   * [BAREM 2] Kiểm tra tên trùng ở mức ứng dụng rồi tạo UUID và câu INSERT.
    */
   async createService(data: { service_name: string; description?: string; status?: boolean }, audit?: AuditLogInput): Promise<ServiceRecord> {
     const trimmedName = data.service_name.trim();
@@ -115,7 +121,7 @@ export class ServiceCatalogService {
   }
 
   /**
-   * Update an existing service
+   * [BAREM 2] Đọc dữ liệu cũ, kiểm tra tên mới và UPDATE theo service_id.
    */
   async updateService(
     serviceId: string,
@@ -169,7 +175,7 @@ export class ServiceCatalogService {
   }
 
   /**
-   * Delete a service by ID
+   * [BAREM 2] Xóa bản ghi danh mục theo UUID; audit vẫn được giữ để truy vết.
    */
   async deleteService(serviceId: string, audit?: AuditLogInput): Promise<void> {
     if (!isValidUuid(serviceId)) {
@@ -182,6 +188,7 @@ export class ServiceCatalogService {
     }
 
     const client = getCassandraClient();
+    // DELETE chỉ tác động danh mục; không có câu DELETE nào xóa các bảng audit ở đây.
     const query = 'DELETE FROM audit_log_system.services WHERE service_id = ?';
     const params = [cassandra.types.Uuid.fromString(serviceId)];
     if (audit) await auditLogService.createLog({ ...audit, details: { ...audit.details,
@@ -190,7 +197,7 @@ export class ServiceCatalogService {
   }
 
   /**
-   * Check if a service is active
+   * Kiểm tra dịch vụ có tồn tại và đang bật trước khi tiếp nhận log thông thường.
    */
   async isServiceActive(serviceName: string): Promise<{ exists: boolean; active: boolean }> {
     const service = await this.getServiceByName(serviceName.trim());

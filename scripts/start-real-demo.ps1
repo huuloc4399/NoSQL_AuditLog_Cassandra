@@ -37,10 +37,14 @@ function Start-ProjectProcess([string]$Name, [string]$Executable, [string[]]$Arg
 }
 
 Write-Host 'Starting the real Cassandra demo...'
+$systemDisk = [IO.DriveInfo]::new($env:SystemDrive + '\')
+if ($systemDisk.AvailableFreeSpace -lt 1GB) {
+    throw "System drive $($env:SystemDrive) has less than 1 GB free. Free space before starting WSL; large crash dumps may be in %TEMP%\wsl-crashes."
+}
 if (-not (Test-LocalPort 9042)) {
     $linuxRoot = Get-ProjectLinuxRoot
     Start-ProjectProcess 'cassandra' $projectWslExe ($projectWslArgs + @('bash', "$linuxRoot/scripts/cassandra-wsl.sh", 'foreground')) $taskRoot
-    Wait-LocalPort 9042
+    Wait-LocalPort 9042 300
 }
 
 if (-not (Test-Path (Join-Path $project 'backend\node_modules\cassandra-driver'))) { Invoke-ProjectNpm (Join-Path $project 'backend') @('ci', '--no-audit', '--no-fund') }
@@ -52,8 +56,17 @@ if (-not (Test-LocalPort 5000)) {
     Start-ProjectProcess 'backend' $node @('dist/server.js') (Join-Path $project 'backend')
     Wait-LocalPort 5000 60
 }
-$health = Invoke-RestMethod 'http://127.0.0.1:5000/api/health' -TimeoutSec 10
-if (-not $health.success -or -not $health.cassandra.release_version -or $health.service -ne 'Audit Log Backend API') { throw 'Backend has not confirmed the project Cassandra connection.' }
+# API cũ có thể còn chờ chu kỳ reconnect sau khi Cassandra vừa mở lại cổng.
+$health = $null
+$healthDeadline = (Get-Date).AddSeconds(30)
+do {
+    try {
+        $candidate = Invoke-RestMethod 'http://127.0.0.1:5000/api/health' -TimeoutSec 5
+        if ($candidate.success -and $candidate.cassandra.release_version -and $candidate.service -eq 'Audit Log Backend API') { $health = $candidate; break }
+    } catch { }
+    Start-Sleep -Milliseconds 500
+} while ((Get-Date) -lt $healthDeadline)
+if (-not $health) { throw 'Backend has not confirmed the project Cassandra connection. Check .runtime/backend.error.log.' }
 Write-Host "Cassandra $($health.cassandra.release_version): $($health.cassandra.cluster_name)"
 Invoke-ProjectNpm (Join-Path $project 'backend') @('run', 'seed:demo')
 Invoke-ProjectNpm (Join-Path $project 'backend') @('run', 'seed:today')

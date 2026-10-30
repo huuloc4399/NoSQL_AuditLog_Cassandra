@@ -1,11 +1,16 @@
+/**
+ * [BAREM 2, 3] Ràng buộc đầu vào của API ghi log và API lọc.
+ * Schema giúp từ chối dữ liệu sai trước khi gọi Cassandra; giới hạn level là INFO/WARN/ERROR.
+ * API tiếp nhận từ chối dữ liệu nhạy cảm được bộ lọc nhận diện; đường ghi nội bộ còn có bước che dữ liệu.
+ */
 import { z } from 'zod';
 import { containsSensitiveData } from '../utils/sensitiveDataFilter.js';
 
-// Allowed audit levels per specification
+// [BAREM 3] Ba mức độ theo đề tài, được z.enum kiểm tra trong payload và bộ lọc.
 export const ALLOWED_LEVELS = ['INFO', 'WARN', 'ERROR'] as const;
 export type AuditLevel = (typeof ALLOWED_LEVELS)[number];
 
-// Allowed actions per service
+// Danh sách action tham khảo theo dịch vụ; schema hiện không ép action thuộc danh sách này.
 export const ALLOWED_ACTIONS: Record<string, string[]> = {
   Auth: ['LOGIN', 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'RESET_PASSWORD'],
   User: ['CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'VIEW_USER', 'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE'],
@@ -13,17 +18,17 @@ export const ALLOWED_ACTIONS: Record<string, string[]> = {
   Payment: ['CREATE_PAYMENT', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'REFUND'],
 };
 
-// UUID v1-v5 validation pattern
+// Kiểm tra định dạng UUID phiên bản 1-5 dùng trong các đường tra cứu.
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isValidUuid(id: string): boolean {
   return UUID_REGEX.test(id);
 }
 
-// IPv4 / IPv6 regex
+// Biểu thức kiểm tra các dạng địa chỉ IP mà schema hiện hỗ trợ.
 const IP_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^localhost$/;
 
-// Zod schema for log creation
+// [BAREM 2] Các trường bắt buộc, kiểu dữ liệu, thời gian và TTL của API nhận log.
 export const createLogSchema = z.object({
   service_name: z
     .string({ required_error: 'service_name is required' })
@@ -59,7 +64,7 @@ export const createLogSchema = z.object({
   log_id: z.string().refine((id) => !id || isValidUuid(id), { message: 'log_id must be a valid UUID' }).optional().nullable(),
   log_time: z.union([z.string().datetime(), z.date()]).optional().nullable(),
 }).superRefine((data, ctx) => {
-  // Validate sensitive data in message
+  // Từ chối thông điệp chứa mẫu dữ liệu nhạy cảm được bộ lọc nhận diện.
   const msgCheck = containsSensitiveData(data.message);
   if (msgCheck.hasSensitive) {
     ctx.addIssue({
@@ -69,7 +74,7 @@ export const createLogSchema = z.object({
     });
   }
 
-  // Validate sensitive data in details
+  // Kiểm tra thêm details; không chỉ kiểm tra phần message hiển thị trên web.
   const detailsStr = typeof data.details === 'object' ? JSON.stringify(data.details) : data.details;
   const detailsCheck = containsSensitiveData(detailsStr);
   if (detailsCheck.hasSensitive) {
@@ -81,7 +86,7 @@ export const createLogSchema = z.object({
   }
 });
 
-// Zod schema for query filtering
+// [BAREM 3] Kiểm tra dịch vụ, mức độ, ngày/giờ, limit và cursor trước khi truy vấn.
 export const queryLogSchema = z.object({
   service: z.string().optional(),
   level: z.enum(ALLOWED_LEVELS, {
@@ -100,7 +105,7 @@ export const queryLogSchema = z.object({
   pageState: z.string().optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.from && data.to) {
-    // If both are HH:mm or HH:mm:ss
+    // Nếu hai đầu đều là giờ trong ngày thì kiểm tra thứ tự từ giờ đến giờ.
     const isTimeOnly = /^\d{2}:\d{2}(:\d{2})?$/.test(data.from) && /^\d{2}:\d{2}(:\d{2})?$/.test(data.to);
     if (isTimeOnly) {
       if (data.from > data.to) {

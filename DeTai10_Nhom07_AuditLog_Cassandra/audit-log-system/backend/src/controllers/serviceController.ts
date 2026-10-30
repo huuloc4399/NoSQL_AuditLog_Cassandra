@@ -1,3 +1,9 @@
+/**
+ * [BAREM 2, 4] CRUD danh mục dịch vụ trên web và tự phát sinh nhật ký.
+ * CREATE_SERVICE, UPDATE_SERVICE, DELETE_SERVICE được ghi dưới nhóm service_name=User.
+ * Demo: thao tác một dịch vụ thử, SELECT services và audit_logs của User cùng ngày UTC.
+ * Chỉ xóa dịch vụ thử; không cần xóa các nhóm chuẩn Auth/User/Order/Payment để trình diễn.
+ */
 import { Request, Response, NextFunction } from 'express';
 import { serviceCatalogService } from '../services/serviceCatalogService.js';
 import { createServiceSchema, updateServiceSchema } from '../validators/serviceValidator.js';
@@ -7,7 +13,7 @@ import { AppError } from '../middleware/errorHandler.js';
 
 export class ServiceController {
   /**
-   * GET /api/services - Retrieve all services
+   * Đọc danh mục dịch vụ hiện có trong Cassandra.
    */
   async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -24,7 +30,7 @@ export class ServiceController {
   }
 
   /**
-   * GET /api/services/:id - Retrieve single service
+   * Đọc một dịch vụ theo UUID; UUID sai nhận 400, không có dữ liệu nhận 404.
    */
   async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -54,7 +60,7 @@ export class ServiceController {
   }
 
   /**
-   * POST /api/services - Register a new service
+   * [BAREM 2] Thêm dịch vụ; mutationAudit lấy actor từ phiên và gắn CREATE_SERVICE.
    */
   async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -73,7 +79,7 @@ export class ServiceController {
   }
 
   /**
-   * PUT /api/services/:id - Update service
+   * [BAREM 2] Sửa tên/mô tả/trạng thái; gắn UPDATE_SERVICE để truy vết thay đổi.
    */
   async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -97,7 +103,7 @@ export class ServiceController {
   }
 
   /**
-   * DELETE /api/services/:id - Delete service
+   * [BAREM 2] Xóa dịch vụ và ghi DELETE_SERVICE mức WARN; không xóa lịch sử audit.
    */
   async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

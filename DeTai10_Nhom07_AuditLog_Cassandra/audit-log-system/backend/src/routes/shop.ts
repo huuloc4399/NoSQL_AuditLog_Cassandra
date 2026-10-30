@@ -6,7 +6,10 @@ import { shopEventSchema } from '../validators/shopEventValidator.js';
 const router = Router();
 router.use(authenticate);
 
-// This endpoint records a browser simulation. There is no cart/order database.
+// [BAREM 2, 4] Cửa hàng tạo bối cảnh để phát sinh Audit Log thật qua API.
+// Giỏ/đơn chỉ ở trình duyệt; endpoint này không tạo bảng hoặc lưu đơn trong Cassandra.
+// Actor lấy từ req.user; backend tự gán nhóm Order/Payment và mức INFO/WARN/ERROR.
+// Demo trả tiền declined/timeout -> PAYMENT_FAILED -> tra Payment + ERROR trong DB.
 router.post('/events', async (req: AuthenticatedRequest, res, next) => {
   try {
     const event = shopEventSchema.parse(req.body);

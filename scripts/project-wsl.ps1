@@ -25,9 +25,16 @@ function Get-ProjectLinuxRoot {
             throw "WSL '$projectWslName' is registered, but its disk is missing: $vhdPath. Restore the disk path; see REAL_DATABASE.md."
         }
     }
-    $output = @(& $projectWslExe @projectWslArgs wslpath -a $projectRuntimeRoot.Replace('\', '/') 2>&1)
+    $pathArgs = @('-d', $projectWslName, '--user', $projectWslUser, '--cd', '/', '--')
+    $output = @(& $projectWslExe @pathArgs wslpath -a $projectRuntimeRoot.Replace('\', '/') 2>&1)
     $wslExit = $LASTEXITCODE
-    $linuxPath = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine).Replace([string][char]0, '').Trim()
-    if ($wslExit -ne 0 -or -not $linuxPath) { throw "WSL '$projectWslName' could not start (exit $wslExit). $linuxPath" }
-    return $linuxPath
+    # WSL có thể in cảnh báo systemd trước đường dẫn dù wslpath trả exit 0.
+    # Chỉ nhận một đường dẫn tuyệt đối; không truyền cảnh báo vào đối số của bash.
+    $outputLines = @($output | ForEach-Object { $_.ToString().Replace([string][char]0, '').Trim() })
+    $linuxPaths = @($outputLines | Where-Object { $_ -match '^/' })
+    if ($wslExit -ne 0 -or $linuxPaths.Count -ne 1) {
+        $diagnostic = $outputLines -join [Environment]::NewLine
+        throw "WSL '$projectWslName' could not start (exit $wslExit). $diagnostic"
+    }
+    return $linuxPaths[0]
 }
